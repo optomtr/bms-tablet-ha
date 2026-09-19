@@ -150,6 +150,11 @@
     "selectable": true
   },
   {
+    "id": "premium_irrigation",
+    "name": "Полив",
+    "selectable": true
+  },
+  {
     "id": "premium_laundry",
     "name": "Постирочная",
     "selectable": true

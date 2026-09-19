@@ -65,6 +65,7 @@ DEVICE_ROLES = (
     "tv",
     "media",
     "fan",
+    "irrigation",
     "sensor_air_temp",
     "sensor_floor_temp",
     "sensor_humidity",

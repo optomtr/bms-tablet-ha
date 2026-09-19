@@ -32,8 +32,9 @@ LIGHT_WORDS = (
 )
 TV_WORDS = ("телевизор", "тв", "tv", "телек", "приставк")
 FAN_WORDS = ("вентил", "вытяж", "проветр", "рекуперат", "fan", "vent", "hood", "exhaust")
+IRRIGATION_WORDS = ("полив", "орошен", "капель", "sprinkler", "irrigation", "drip")
 
-SUPPORTED_DOMAINS = ("light", "switch", "fan", "media_player", "climate", "cover", "sensor")
+SUPPORTED_DOMAINS = ("light", "switch", "valve", "fan", "media_player", "climate", "cover", "sensor")
 
 
 def is_floor_related(name: str) -> bool:
@@ -54,6 +55,11 @@ def climate_role(name: str) -> str:
 def looks_like_light(name: str) -> bool:
     lowered = (name or "").lower()
     return any(word in lowered for word in LIGHT_WORDS)
+
+
+def looks_like_irrigation(*names: str) -> bool:
+    """Полив узнаём по имени или по entity_id: в щите реле зовут `switch.poliv_1`."""
+    return any(word in (name or "").lower() for name in names for word in IRRIGATION_WORDS)
 
 
 def toggle_role(domain: str, name: str, device_class: str | None = None) -> str:
@@ -81,7 +87,7 @@ MAX_SWITCHES_PER_DEVICE = 8
 
 
 def switch_is_useful(name: str, switches_on_device: int) -> bool:
-    """`switch.*`, который планшет узнаёт по имени: свет, ТВ или вентиляция.
+    """`switch.*`, который планшет узнаёт по имени: свет, ТВ, вентиляция или полив.
 
     Розетки, клапаны и служебные тумблеры техники планшету не нужны: его дело
     свет, климат и шторы, а не полный список сущностей дома.
@@ -93,6 +99,7 @@ def switch_is_useful(name: str, switches_on_device: int) -> bool:
         any(word in lowered for word in LIGHT_WORDS)
         or any(word in lowered for word in TV_WORDS)
         or any(word in lowered for word in FAN_WORDS)
+        or any(word in lowered for word in IRRIGATION_WORDS)
     )
 
 
@@ -112,9 +119,20 @@ def auto_role(
 
     if domain == "light":
         return "light"
+    if domain == "valve":
+        # Клапан воды — это полив, как бы его ни назвали. Остальные клапаны
+        # (газ, стояк) на планшет сами не лезут: перекрыть газ с настенной
+        # плитки — не то, чего от неё ждут. Руками добавить их можно.
+        if device_class == "water" or looks_like_irrigation(friendly_name, entity_id):
+            return "irrigation"
+        return None
     if domain == "switch":
         if switches_on_device > MAX_SWITCHES_PER_DEVICE:
             return None
+        # Полив сильнее света и вентиляции: «Свет у полива» на грядке — это
+        # всё-таки полив, а вот `light.*` над грядкой остаётся светом.
+        if looks_like_irrigation(friendly_name, entity_id):
+            return "irrigation"
         if looks_like_light(friendly_name):
             return "light"
         if switch_is_useful(friendly_name, switches_on_device):
@@ -301,7 +319,7 @@ def async_entity_catalog(hass: HomeAssistant) -> list[dict[str, Any]]:
                 role = sensor_role_by_unit(state)
                 if role is None:
                     continue
-            elif entry.domain in ("switch", "fan", "media_player"):
+            elif entry.domain in ("switch", "valve", "fan", "media_player"):
                 role = "other"
             else:
                 continue

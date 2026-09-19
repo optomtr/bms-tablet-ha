@@ -22,6 +22,7 @@ const ROLE_LABELS = {
   tv: "Телевизор",
   media: "Музыка",
   fan: "Вентиляция",
+  irrigation: "Полив",
   other: "Прочее",
   sensor_air_temp: "Датчик · воздух",
   sensor_floor_temp: "Датчик · пол",
@@ -34,7 +35,7 @@ const ROLE_LABELS = {
 // шаблона без device_class — и определить его может только человек.
 const ROLE_CHOICES = [
   "auto", "light", "ac", "floor", "radiator", "convector",
-  "cover", "tv", "media", "fan",
+  "cover", "tv", "media", "fan", "irrigation",
   "sensor_air_temp", "sensor_floor_temp", "sensor_humidity",
   "other", "hidden",
 ];
@@ -44,6 +45,7 @@ const ROLE_GROUPS = [
   ["Свет", ["light"], "#f3a83c"],
   ["Климат", ["ac", "floor", "radiator", "convector"], "#5bb8e8"],
   ["Шторы", ["cover"], "#8f9bff"],
+  ["Полив", ["irrigation"], "#3fb9c9"],
   ["Техника", ["tv", "media", "fan", "other"], "#37c58e"],
   ["Датчики", ["sensor_air_temp", "sensor_floor_temp", "sensor_humidity"], "#9aa2ae"],
 ];
