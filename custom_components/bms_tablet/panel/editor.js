@@ -147,6 +147,8 @@ const STYLE = `
   .row .nm small { opacity: .55; font-size: 12px; display: block;
                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row.excluded .nm, .row.excluded select { opacity: .4; }
+  .row .nm .zone { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .8; margin-top: 4px; }
+  .row .nm .zone input { width: 180px; }
   .state { font-size: 12px; opacity: .75; min-width: 62px; text-align: right; font-variant-numeric: tabular-nums; }
   .manual { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--primary-color);
             color: var(--text-primary-color,#fff); font-weight: 400; }
@@ -458,6 +460,7 @@ class BmsTabletEditor extends HTMLElement {
           <div class="field"><label>Название на планшете</label><input type="text" maxlength="100" data-act="room-name" data-id="${esc(area.area_id)}" value="${esc(cfg.name || "")}" placeholder="${esc(area.name)}"></div>
           <div class="field"><label>Этаж / зона на планшете</label><input type="text" maxlength="100" data-act="room-floor" data-id="${esc(area.area_id)}" value="${esc(cfg.floor_name || "")}" placeholder="${esc(area.floor_name || "Как в Home Assistant")}"></div>
           <p class="hint">Пустое поле — название из Home Assistant. Изменения касаются только планшета. Сохраняются после выхода из поля.</p>
+          <p class="hint">Устройства с одинаковой зоной планшет показывает отдельной карточкой. Название вида «Летняя кухня · Споты» тоже задаёт зону.</p>
           <button data-act="room-photo" data-id="${esc(area.area_id)}">Настроить фотографию комнаты</button>
           ${entities.length === 0 ? `<p class="hint">В этой комнате нет устройств. Добавьте вручную ниже.</p>` : ""}
           <p class="hint">Тёплый пол, конвектор и радиатор — отдельные термостаты. Добавьте каждый из Home Assistant и выберите его тип в строке устройства. Название, питание и температура у каждого свои. Для реле сначала создайте термостат в Home Assistant.</p>
@@ -469,6 +472,7 @@ class BmsTabletEditor extends HTMLElement {
             </select>
           </div>
           ${entities.map((e) => this._renderEntity(area, e, excluded)).join("")}
+          <datalist id="zones-${esc(area.area_id)}">${[...new Set(Object.values(cfg.entity_zones || {}))].map((z) => `<option value="${esc(z)}">`).join("")}</datalist>
           <div class="add">
             <select data-act="add-entity-select" data-id="${esc(area.area_id)}">
               <option value="">— добавить устройство или датчик вручную —</option>
@@ -486,6 +490,7 @@ class BmsTabletEditor extends HTMLElement {
     const isExcluded = excluded.has(entity.entity_id);
     const roles = this._roomCfg(area.area_id).roles || {};
     const role = roles[entity.entity_id] || "auto";
+    const zones = this._roomCfg(area.area_id).entity_zones || {};
     const effective = role === "auto" ? entity.role : role;
     const testable = ["light", "ac", "floor", "radiator", "convector", "cover", "tv", "media", "fan", "other"]
       .includes(effective);
@@ -499,6 +504,7 @@ class BmsTabletEditor extends HTMLElement {
           <input aria-label="Название ${esc(entity.entity_id)}" type="text" maxlength="100" data-act="entity-name" data-area="${esc(area.area_id)}" data-id="${esc(entity.entity_id)}" value="${esc((this._roomCfg(area.area_id).entity_names || {})[entity.entity_id] || "")}" placeholder="${esc(entity.name)}">
           <b>${entity.manual ? '<span class="manual">вручную</span>' : ""}</b>
           <small>${esc(entity.entity_id)} · автоопределение: ${esc(ROLE_LABELS[entity.role] || entity.role)}</small>
+          <label class="zone">Зона внутри комнаты <input aria-label="Зона внутри комнаты ${esc(entity.entity_id)}" type="text" maxlength="60" list="zones-${esc(area.area_id)}" data-act="entity-zone" data-area="${esc(area.area_id)}" data-id="${esc(entity.entity_id)}" value="${esc(zones[entity.entity_id] || "")}" placeholder="Без зоны"></label>
         </div>
         <span class="state">${esc(this._stateOf(entity.entity_id))}</span>
         <select data-act="role" data-area="${esc(area.area_id)}" data-id="${esc(entity.entity_id)}">
@@ -736,6 +742,7 @@ class BmsTabletEditor extends HTMLElement {
       if (act === "room-name") return this._patchRoom(id,{name:target.value.trim() || null});
       if (act === "room-floor") return this._patchRoom(id,{floor_name:target.value.trim() || null});
       if (act === "entity-name") return this._patchRoom(target.dataset.area,{entity_names:{[id]:target.value.trim() || null}});
+      if (act === "entity-zone") return this._patchRoom(target.dataset.area,{entity_zones:{[id]:target.value.trim().slice(0,60) || null}});
       if (["zoom","dx","dy"].includes(act)) return this._ws("background/set",{area_id:id,transform:{[act]:Number(target.value)/100}}).then(()=>this._reload());
       if (act === "visible") {
         event.stopPropagation();

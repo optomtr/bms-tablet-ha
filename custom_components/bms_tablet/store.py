@@ -94,7 +94,7 @@ def _migrate(data: dict[str, Any] | None) -> dict[str, Any]:
     return {"home": default_home(), "backgrounds": backgrounds}
 
 
-MAP_KEYS = ("roles", "entity_names", "cover_directions", "entity_icons")
+MAP_KEYS = ("roles", "entity_names", "cover_directions", "entity_icons", "entity_zones")
 LIST_KEYS = ("exclude", "include")
 
 

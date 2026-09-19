@@ -380,6 +380,8 @@ def async_room_payload(
             entity = {"entity_id": item["entity_id"], "name": (cfg.get("entity_names") or {}).get(item["entity_id"]) or item["name"], "role": role}
             icon = (cfg.get("entity_icons") or {}).get(item["entity_id"])
             if icon: entity["icon"] = icon
+            zone = (cfg.get("entity_zones") or {}).get(item["entity_id"])
+            if zone: entity["zone"] = zone  # отдельная карточка зоны внутри комнаты
             if role == "cover":
                 entity["cover_direction"] = (cfg.get("cover_directions") or {}).get(item["entity_id"], "center")
             entities.append(entity)
