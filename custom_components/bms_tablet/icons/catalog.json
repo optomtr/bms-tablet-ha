@@ -1,0 +1,227 @@
+[
+  {
+    "id": "ic_ac",
+    "name": "Кондиционер",
+    "selectable": true
+  },
+  {
+    "id": "ic_close",
+    "name": "Закрыть",
+    "selectable": true
+  },
+  {
+    "id": "ic_convector",
+    "name": "Конвектор",
+    "selectable": true
+  },
+  {
+    "id": "ic_curtain",
+    "name": "Шторы",
+    "selectable": true
+  },
+  {
+    "id": "ic_fan",
+    "name": "Вентиляция",
+    "selectable": true
+  },
+  {
+    "id": "ic_flame",
+    "name": "Пламя",
+    "selectable": true
+  },
+  {
+    "id": "ic_floor",
+    "name": "Тёплый пол",
+    "selectable": true
+  },
+  {
+    "id": "ic_grid",
+    "name": "Сетка",
+    "selectable": true
+  },
+  {
+    "id": "ic_humidity",
+    "name": "Влажность",
+    "selectable": true
+  },
+  {
+    "id": "ic_light",
+    "name": "Лампа",
+    "selectable": true
+  },
+  {
+    "id": "ic_light_lit",
+    "name": "Лампа · свечение",
+    "selectable": false
+  },
+  {
+    "id": "ic_minus",
+    "name": "Минус",
+    "selectable": true
+  },
+  {
+    "id": "ic_music",
+    "name": "Музыка",
+    "selectable": true
+  },
+  {
+    "id": "ic_phone",
+    "name": "Домофон",
+    "selectable": true
+  },
+  {
+    "id": "ic_plus",
+    "name": "Плюс",
+    "selectable": true
+  },
+  {
+    "id": "ic_power",
+    "name": "Питание",
+    "selectable": true
+  },
+  {
+    "id": "ic_radiator",
+    "name": "Радиатор",
+    "selectable": true
+  },
+  {
+    "id": "ic_settings",
+    "name": "Настройки",
+    "selectable": true
+  },
+  {
+    "id": "ic_sun",
+    "name": "Солнце",
+    "selectable": true
+  },
+  {
+    "id": "ic_thermo",
+    "name": "Температура",
+    "selectable": true
+  },
+  {
+    "id": "ic_tv",
+    "name": "Телевизор",
+    "selectable": true
+  },
+  {
+    "id": "premium_back",
+    "name": "Назад",
+    "selectable": true
+  },
+  {
+    "id": "premium_bath",
+    "name": "Санузел",
+    "selectable": true
+  },
+  {
+    "id": "premium_chandelier",
+    "name": "Люстра",
+    "selectable": true
+  },
+  {
+    "id": "premium_chandelier_lit",
+    "name": "Люстра · свечение",
+    "selectable": false
+  },
+  {
+    "id": "premium_gate",
+    "name": "Ворота",
+    "selectable": true
+  },
+  {
+    "id": "premium_geyser",
+    "name": "Гейзер / фонтан",
+    "selectable": true
+  },
+  {
+    "id": "premium_home",
+    "name": "Дом",
+    "selectable": true
+  },
+  {
+    "id": "premium_hood",
+    "name": "Кухонная вытяжка",
+    "selectable": true
+  },
+  {
+    "id": "premium_hydromassage",
+    "name": "Гидромассаж",
+    "selectable": true
+  },
+  {
+    "id": "premium_laundry",
+    "name": "Постирочная",
+    "selectable": true
+  },
+  {
+    "id": "premium_motor",
+    "name": "Мотор / насос",
+    "selectable": true
+  },
+  {
+    "id": "premium_next",
+    "name": "Вперёд",
+    "selectable": true
+  },
+  {
+    "id": "premium_pool",
+    "name": "Бассейн",
+    "selectable": true
+  },
+  {
+    "id": "premium_sconce",
+    "name": "Бра",
+    "selectable": true
+  },
+  {
+    "id": "premium_sconce_lit",
+    "name": "Бра · свечение",
+    "selectable": false
+  },
+  {
+    "id": "premium_spots",
+    "name": "Споты",
+    "selectable": true
+  },
+  {
+    "id": "premium_spots_lit",
+    "name": "Споты · свечение",
+    "selectable": false
+  },
+  {
+    "id": "premium_stairs",
+    "name": "Лестница",
+    "selectable": true
+  },
+  {
+    "id": "premium_storage",
+    "name": "Кладовая",
+    "selectable": true
+  },
+  {
+    "id": "premium_strip",
+    "name": "Подсветка",
+    "selectable": true
+  },
+  {
+    "id": "premium_strip_lit",
+    "name": "Подсветка · свечение",
+    "selectable": false
+  },
+  {
+    "id": "premium_terrace",
+    "name": "Терраса",
+    "selectable": true
+  },
+  {
+    "id": "premium_tree",
+    "name": "Дерево",
+    "selectable": true
+  },
+  {
+    "id": "premium_wardrobe",
+    "name": "Гардероб",
+    "selectable": true
+  }
+]

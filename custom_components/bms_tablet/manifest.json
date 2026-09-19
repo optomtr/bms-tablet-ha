@@ -1,0 +1,23 @@
+{
+  "domain": "bms_tablet",
+  "name": "BMS Tablet",
+  "codeowners": [
+    "@optomtr"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "http",
+    "websocket_api",
+    "frontend",
+    "panel_custom"
+  ],
+  "documentation": "https://github.com/optomtr/bms-tablet-ha",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/optomtr/bms-tablet-ha/issues",
+  "requirements": [
+    "Pillow>=10.4.0"
+  ],
+  "single_config_entry": true,
+  "version": "0.6.2"
+}

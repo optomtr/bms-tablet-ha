@@ -1,0 +1,19 @@
+update_config:
+  name: Изменить настройки
+  description: >-
+    Точечно меняет настройки дома. Обычно это делает редактор в боковой панели —
+    сервис нужен для сценариев.
+  fields:
+    patch:
+      name: Изменения
+      description: Объект с полями name, start_area, ambient, rooms.
+      required: true
+      example: '{"ambient": {"mode": "timeout", "timeout_sec": 180}}'
+      selector:
+        object:
+
+reset_config:
+  name: Сбросить настройки комнат
+  description: >-
+    Возвращает комнаты к чистому автоопределению — все правки монтажника
+    стираются. Фотографии комнат остаются.

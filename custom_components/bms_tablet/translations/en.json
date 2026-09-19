@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "BMS Tablets",
+        "description": "Adds the integration for BMS wall tablets. Nothing to configure here — tablets are managed from the \"BMS Планшеты\" sidebar panel."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "The integration is already set up."
+    }
+  }
+}
