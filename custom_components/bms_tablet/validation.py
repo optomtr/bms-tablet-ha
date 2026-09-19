@@ -5,6 +5,14 @@ import re
 from .icon_catalog import ICON_IDS
 from .const import DEVICE_ROLES
 
+# Ключ фона: area_id комнаты, «__home__» (общий фон) или «__home__N» — фон планшета N (1..99).
+BACKGROUND_KEY = re.compile(r"^(?:(?!__home__)[\w-]{1,128}|__home__(?:[1-9]\d?)?)\Z")
+
+
+def background_key(value):
+    if not isinstance(value, str) or not BACKGROUND_KEY.match(value): raise ValueError("Некорректный ключ фона")
+    return value
+
 
 def number(value, low, high):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not low <= value <= high:

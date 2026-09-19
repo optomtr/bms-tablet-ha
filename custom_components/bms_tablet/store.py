@@ -20,7 +20,7 @@ import asyncio
 import logging
 from copy import deepcopy
 from functools import wraps
-from .validation import validate_home_patch, number
+from .validation import background_key, validate_home_patch, number
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -247,6 +247,7 @@ class BmsTabletStore:
         blur: float | None = None,
         transform: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        background_key(area_id)
         if dim is not None: number(dim,0,.9)
         if blur is not None: number(blur,0,1)
         if transform is not None:

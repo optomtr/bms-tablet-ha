@@ -14,8 +14,9 @@ from .const import DEVICE_ROLES, DOMAIN, HOME_ID, SENSOR_ENTITY_ID
 from .icon_catalog import ICONS
 from .discovery import async_collect_areas, async_entity_catalog, async_room_payload
 from .store import NotLoaded, get_store
+from .validation import BACKGROUND_KEY
 
-AREA_ID = vol.Match(r"^[\w-]{1,128}$")
+AREA_ID = vol.Match(BACKGROUND_KEY)
 
 
 def _loaded(handler):

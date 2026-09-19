@@ -19,5 +19,5 @@
     "Pillow>=10.4.0"
   ],
   "single_config_entry": true,
-  "version": "0.6.4"
+  "version": "0.6.5"
 }

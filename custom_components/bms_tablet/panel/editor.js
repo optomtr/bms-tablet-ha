@@ -540,41 +540,55 @@ class BmsTabletEditor extends HTMLElement {
 
   _renderBackgrounds() {
     const backgrounds = this._config.backgrounds || {};
+    const tablets = this._bgTablets(backgrounds);
     return `
       <p class="hint">Общий фон применяется к главной странице и разделам. Фото комнаты появляется на её карточке и за устройствами. Масштаб и смещение действуют в обоих местах; затемнение и размытие — на фоне за устройствами.
       Ползунки видно сразу на снимке: где-то комнату хочется показать чётко,
       где-то фон должен просто не мешать карточкам.</p>
-      ${[{area_id:"__home__",name:"Общий фон дома"}, ...this._areas].map((area) => {
-        const bg = backgrounds[area.area_id] || {};
-        const url = bg.preview_url || "";
-        const transform = Object.assign({zoom:1,dx:0,dy:0}, bg.transform || {});
-        const blur = Math.round((bg.blur === undefined ? 0.35 : bg.blur) * 100);
-        const dim = Math.round((bg.dim === undefined ? 0.24 : bg.dim) * 100);
-        return `
-          <div class="card" data-background="${esc(area.area_id)}"><div class="bg">
-            <div class="frame" data-frame="${esc(area.area_id)}">
-              ${url
-                ? `<div class="img" data-img="${esc(area.area_id)}"
-                        style="background-image:url('${esc(url)}');filter:blur(${blur * 0.18}px);transform:translate(${transform.dx*50}%,${transform.dy*50}%) scale(${transform.zoom})"></div>
-                   <div class="veil" data-veil="${esc(area.area_id)}" style="opacity:${dim / 100}"></div>`
-                : `<div class="none">нет фото</div>`}
-            </div>
-            <div class="ctrls">
-              <div class="title">${esc(this._roomCfg(area.area_id).name || area.name)}</div>
-              <div class="field"><label data-label="blur-${esc(area.area_id)}">Размытие · ${blur}%</label>
-                <input type="range" min="0" max="100" value="${blur}"
-                       data-act="blur" data-id="${esc(area.area_id)}"></div>
-              <div class="field"><label data-label="dim-${esc(area.area_id)}">Затемнение · ${dim}%</label>
-                <input type="range" min="0" max="90" value="${dim}"
-                       data-act="dim" data-id="${esc(area.area_id)}"></div>
-              ${[["zoom","Масштаб",50,400], ["dx","Смещение по горизонтали",-100,100], ["dy","Смещение по вертикали",-100,100]].map(([key,label,min,max]) => `<div class="field"><label>${label}</label><input aria-label="${label}" type="range" min="${min}" max="${max}" value="${Math.round(transform[key]*100)}" data-act="${key}" data-id="${esc(area.area_id)}"></div>`).join("")}
-              <div style="display:flex;gap:10px">
-                <button data-act="upload" data-id="${esc(area.area_id)}">${url ? "Заменить фото" : "Загрузить фото"}</button>
-                ${url ? `<button class="danger" data-act="drop-bg" data-id="${esc(area.area_id)}">Удалить</button>` : ""}
-              </div>
-            </div>
-          </div></div>`;
-      }).join("")}`;
+      ${this._bgCard({area_id:"__home__",name:"Общий фон дома",sub:"Для планшетов без номера"}, backgrounds)}
+      ${tablets.map((n) => this._bgCard({area_id:`__home__${n}`,name:`Фон · Планшет ${n}`,tablet:n}, backgrounds)).join("")}
+      <button data-act="add-tablet-bg" style="margin-bottom:6px">+ Фон для планшета</button>
+      <p class="hint">На планшете: Настройки → Номер планшета.</p>
+      ${this._areas.map((area) => this._bgCard(area, backgrounds)).join("")}`;
+  }
+
+  /** Номера планшетов со своим общим фоном (__home__N), включая только что добавленные. */
+  _bgTablets(backgrounds) {
+    const nums = new Set(this._bgExtra || []);
+    Object.keys(backgrounds).forEach((key) => { const m = /^__home__([1-9]\d?)$/.exec(key); if (m) nums.add(Number(m[1])); });
+    return [...nums].sort((a, b) => a - b);
+  }
+
+  _bgCard(area, backgrounds) {
+    const bg = backgrounds[area.area_id] || {};
+    const url = bg.preview_url || "";
+    const transform = Object.assign({zoom:1,dx:0,dy:0}, bg.transform || {});
+    const blur = Math.round((bg.blur === undefined ? 0.35 : bg.blur) * 100);
+    const dim = Math.round((bg.dim === undefined ? 0.24 : bg.dim) * 100);
+    return `
+      <div class="card" data-background="${esc(area.area_id)}"><div class="bg">
+        <div class="frame" data-frame="${esc(area.area_id)}">
+          ${url
+            ? `<div class="img" data-img="${esc(area.area_id)}"
+                    style="background-image:url('${esc(url)}');filter:blur(${blur * 0.18}px);transform:translate(${transform.dx*50}%,${transform.dy*50}%) scale(${transform.zoom})"></div>
+               <div class="veil" data-veil="${esc(area.area_id)}" style="opacity:${dim / 100}"></div>`
+            : `<div class="none">нет фото</div>`}
+        </div>
+        <div class="ctrls">
+          <div class="title">${esc(this._roomCfg(area.area_id).name || area.name)}</div>${area.sub ? `<p class="hint" style="margin:-8px 0 12px">${esc(area.sub)}</p>` : ""}
+          <div class="field"><label data-label="blur-${esc(area.area_id)}">Размытие · ${blur}%</label>
+            <input type="range" min="0" max="100" value="${blur}"
+                   data-act="blur" data-id="${esc(area.area_id)}"></div>
+          <div class="field"><label data-label="dim-${esc(area.area_id)}">Затемнение · ${dim}%</label>
+            <input type="range" min="0" max="90" value="${dim}"
+                   data-act="dim" data-id="${esc(area.area_id)}"></div>
+          ${[["zoom","Масштаб",50,400], ["dx","Смещение по горизонтали",-100,100], ["dy","Смещение по вертикали",-100,100]].map(([key,label,min,max]) => `<div class="field"><label>${label}</label><input aria-label="${label}" type="range" min="${min}" max="${max}" value="${Math.round(transform[key]*100)}" data-act="${key}" data-id="${esc(area.area_id)}"></div>`).join("")}
+          <div style="display:flex;gap:10px">
+            <button data-act="upload" data-id="${esc(area.area_id)}">${url ? "Заменить фото" : "Загрузить фото"}</button>
+            ${url || area.tablet ? `<button class="danger" data-act="drop-bg" data-id="${esc(area.area_id)}">Удалить</button>` : ""}
+          </div>
+        </div>
+      </div></div>`;
   }
 
   // ------------------------------------------------ вкладка «Планшет»
@@ -690,6 +704,14 @@ class BmsTabletEditor extends HTMLElement {
       }
       if (act === "upload") return this._upload(id);
       if (act === "drop-bg") return this._dropBackground(id);
+      if (act === "add-tablet-bg") {
+        const used = this._bgTablets(this._config.backgrounds || {});
+        const n = [...Array(99).keys()].map((i) => i + 1).find((i) => !used.includes(i));
+        if (!n) return;
+        (this._bgExtra = this._bgExtra || new Set()).add(n);
+        this._render();
+        return this._upload(`__home__${n}`);
+      }
       if (act === "reset") return this._reset();
       if (act === "create-area") return this._createArea();
     });
@@ -862,7 +884,10 @@ class BmsTabletEditor extends HTMLElement {
   }
 
   async _dropBackground(areaId) {
-    if (!confirm("Удалить фото комнаты?")) return;
+    const tablet = /^__home__\d+$/.test(areaId);
+    if (!confirm(tablet ? "Удалить фон этого планшета?" : "Удалить фото комнаты?")) return;
+    if (tablet) this._bgExtra?.delete(Number(areaId.slice(8)));
+    if (tablet && !(this._config.backgrounds || {})[areaId]) return this._render();
     return this._enqueue(async () => {
       let dropError = "";
       try {

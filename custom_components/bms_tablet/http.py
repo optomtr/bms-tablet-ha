@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import BACKGROUND_DIR, BACKGROUND_EXTENSIONS, BACKGROUND_MAX_BYTES, BACKGROUND_URL_PATH, DOMAIN
 from .store import BmsTabletStore, NotLoaded, get_store
+from .validation import BACKGROUND_KEY
 
 
 def background_dir(hass: HomeAssistant) -> Path:
@@ -22,7 +23,12 @@ def background_dir(hass: HomeAssistant) -> Path:
 
 
 def valid_id(value: str) -> bool:
+    """Имя файла фото: «ключ-uuid» — и для «__home__-…», поэтому не ключ фона."""
     return bool(re.fullmatch(r"[\w-]{1,128}", value))
+
+
+def valid_key(value: str) -> bool:
+    return bool(BACKGROUND_KEY.match(value))
 
 
 def validate_image(data: bytes, extension: str) -> None:
@@ -79,7 +85,7 @@ class BackgroundUploadView(HomeAssistantView):
         user = request.get("hass_user")
         if not user or not user.is_admin:
             return self.json_message("Нужны права администратора", 403)
-        if not valid_id(area_id):
+        if not valid_key(area_id):
             return self.json_message("Некорректная комната", 400)
         if (self._hass.data.get(DOMAIN) or {}).get("store") is None:
             return self.json_message("Интеграция не загружена", 503)
@@ -128,7 +134,7 @@ class BackgroundUploadView(HomeAssistantView):
         user = request.get("hass_user")
         if not user or not user.is_admin:
             return self.json_message("Нужны права администратора", 403)
-        if not valid_id(area_id):
+        if not valid_key(area_id):
             return self.json_message("Некорректная комната", 400)
         if self._busy.locked():
             return self.json_message("Загрузка уже выполняется, повторите позже", 429)
