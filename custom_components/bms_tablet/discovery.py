@@ -81,7 +81,7 @@ MAX_SWITCHES_PER_DEVICE = 8
 
 
 def switch_is_useful(name: str, switches_on_device: int) -> bool:
-    """`switch.*` выносим на планшет, только если это свет, ТВ или вентиляция.
+    """`switch.*`, который планшет узнаёт по имени: свет, ТВ или вентиляция.
 
     Розетки, клапаны и служебные тумблеры техники планшету не нужны: его дело
     свет, климат и шторы, а не полный список сущностей дома.
@@ -113,11 +113,16 @@ def auto_role(
     if domain == "light":
         return "light"
     if domain == "switch":
-        if not switch_is_useful(friendly_name, switches_on_device):
+        if switches_on_device > MAX_SWITCHES_PER_DEVICE:
             return None
         if looks_like_light(friendly_name):
             return "light"
-        return toggle_role(domain, friendly_name, device_class)
+        if switch_is_useful(friendly_name, switches_on_device):
+            return toggle_role(domain, friendly_name, device_class)
+        # Всё остальное, что стоит в зоне, — тоже на планшет: реле тёплого пола,
+        # насосы, розетки. Планшет показывает комнату такой, какая она в HA;
+        # служебные тумблеры (entity_category) отсеиваются раньше.
+        return "other"
     if domain in ("fan", "media_player"):
         return toggle_role(domain, friendly_name, device_class)
     if domain == "climate":
