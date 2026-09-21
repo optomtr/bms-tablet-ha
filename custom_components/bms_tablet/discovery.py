@@ -404,8 +404,8 @@ def async_room_payload(
                 entity["cover_direction"] = (cfg.get("cover_directions") or {}).get(item["entity_id"], "center")
             entities.append(entity)
 
-        if not entities:
-            continue
+        # Комната без устройств — тоже комната: владелец видит на планшете все
+        # зоны дома. Спрятать её можно только галочкой (visible=False выше).
 
         background = backgrounds.get(area_id)
         payload.append(

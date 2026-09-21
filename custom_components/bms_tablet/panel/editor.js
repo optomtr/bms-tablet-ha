@@ -411,7 +411,7 @@ class BmsTabletEditor extends HTMLElement {
       </div>
       <p class="hint">Комнаты и устройства заполнены автоматически из зон Home Assistant.
       Снимите галочки с лишнего, поправьте тип, где автоопределение ошиблось,
-      и добавьте недостающее вручную. Комната без устройств на планшет не попадёт.</p>
+      и добавьте недостающее вручную. Комната без устройств тоже видна на планшете, спрятать её можно галочкой.</p>
       ${rows || `<div class="empty">Ничего не нашлось.</div>`}`;
   }
 
@@ -443,7 +443,7 @@ class BmsTabletEditor extends HTMLElement {
     const warning = !visible
       ? `<span class="chip warn">скрыта</span>`
       : shown.length === 0
-        ? `<span class="chip warn">не попадёт на планшет</span>`
+        ? `<span class="chip muted">без устройств</span>`
         : "";
 
     return `
