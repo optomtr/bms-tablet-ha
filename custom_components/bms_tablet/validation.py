@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from .icon_catalog import ICON_IDS
-from .const import DEVICE_ROLES
+from .const import DEVICE_ROLES, DOORSTATION_ENTITY_KEYS
 
 # Ключ фона: area_id комнаты, «__home__» (общий фон) или «__home__N» — фон планшета N (1..99).
 BACKGROUND_KEY = re.compile(r"^(?:(?!__home__)[\w-]{1,128}|__home__(?:[1-9]\d?)?)\Z")
@@ -28,11 +28,51 @@ def text(value, limit=100, nullable=False):
     return value
 
 
+# `domain.object_id` — ровно то, что Home Assistant считает entity_id.
+ENTITY_ID = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\Z")
+
+
+def entity_id(value, domains):
+    """Ссылка на сущность нужного домена; пустая строка и None — «не выбрано»."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or len(value) > 255 or not ENTITY_ID.match(value):
+        raise ValueError("Некорректная сущность")
+    if value.split(".", 1)[0] not in domains:
+        raise ValueError("Сущность не того типа: ожидается " + ", ".join(d + ".*" for d in domains))
+    return value
+
+
+def validate_doorstation(value):
+    """Домофон: ссылки на камеру, датчик вызова и кнопки.
+
+    None стирает домофон целиком. Пустой словарь — тоже: домофон без единой
+    сущности планшету нечего показывать, и хранить такую запись незачем.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) - set(DOORSTATION_ENTITY_KEYS) - {"name"}:
+        raise ValueError("Неизвестные настройки домофона")
+    result = {}
+    for key, domains in DOORSTATION_ENTITY_KEYS.items():
+        if key not in value:
+            continue
+        chosen = entity_id(value[key], domains)
+        if chosen is not None:
+            result[key] = chosen
+    if "name" in value:
+        name = text(value["name"], 100, True)
+        if isinstance(name, str) and name.strip():
+            result["name"] = name.strip()
+    return result or None
+
+
 def validate_home_patch(patch, merge=False):
-    if not isinstance(patch, dict) or set(patch) - {"name", "start_area", "ambient", "rooms"}:
+    if not isinstance(patch, dict) or set(patch) - {"name", "start_area", "ambient", "rooms", "doorstation"}:
         raise ValueError("Неизвестные настройки дома")
     if "name" in patch: text(patch["name"])
     if "start_area" in patch: text(patch["start_area"],128,True)
+    if "doorstation" in patch: validate_doorstation(patch["doorstation"])
     if "ambient" in patch:
         ambient=patch["ambient"]
         if not isinstance(ambient,dict) or set(ambient)-{"mode","timeout_sec","motion_entity","brightness_active","brightness_ambient"}: raise ValueError("Некорректный спящий режим")

@@ -33,7 +33,7 @@ from .const import (
     SENSOR_ENTITY_ID,
     SIGNAL_CONFIG_CHANGED,
 )
-from .discovery import SUPPORTED_DOMAINS, async_room_payload
+from .discovery import SUPPORTED_DOMAINS, async_doorstation_payload, async_room_payload
 from .store import BmsTabletStore, get_store
 
 _LOGGER = logging.getLogger(__name__)
@@ -200,6 +200,10 @@ class BmsTabletSensor(SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         home = self._store.home()
         backgrounds = self._store.backgrounds()
+        # Домофона на объекте может не быть — тогда ключа нет вовсе. Планшет
+        # прежней версии читает конфиг как читал, а новый видит отсутствие
+        # ключа как «домофон не заведён», не отличая его от старой интеграции.
+        doorstation = async_doorstation_payload(home)
         # Только копии: HA сравнивает новые атрибуты со старыми, и живой словарь
         # хранилища, изменённый на месте, совпал бы сам с собой — state_changed
         # не ушёл бы, и планшет не увидел бы новое фото или кадрирование.
@@ -213,6 +217,7 @@ class BmsTabletSensor(SensorEntity):
             "ambient": home.get("ambient") or {},
             "rooms": async_room_payload(self.hass, home, backgrounds),
             "backgrounds": backgrounds,
+            **({"doorstation": doorstation} if doorstation else {}),
         })
 
 

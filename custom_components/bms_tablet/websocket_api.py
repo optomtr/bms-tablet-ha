@@ -12,7 +12,12 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .const import DEVICE_ROLES, DOMAIN, HOME_ID, SENSOR_ENTITY_ID
 from .icon_catalog import ICONS
-from .discovery import async_collect_areas, async_entity_catalog, async_room_payload
+from .discovery import (
+    async_collect_areas,
+    async_doorstation_payload,
+    async_entity_catalog,
+    async_room_payload,
+)
 from .store import NotLoaded, get_store
 from .validation import BACKGROUND_KEY
 
@@ -93,6 +98,7 @@ def ws_list_tablets(hass: HomeAssistant, connection, msg: dict[str, Any]) -> Non
     store = get_store(hass)
     home = store.home()
     backgrounds = store.backgrounds()
+    doorstation = async_doorstation_payload(home)
     connection.send_result(
         msg["id"],
         [
@@ -104,6 +110,7 @@ def ws_list_tablets(hass: HomeAssistant, connection, msg: dict[str, Any]) -> Non
                 "ambient": home.get("ambient") or {},
                 "rooms": async_room_payload(hass, home, backgrounds),
                 "backgrounds": backgrounds,
+                **({"doorstation": doorstation} if doorstation else {}),
             }
         ],
     )

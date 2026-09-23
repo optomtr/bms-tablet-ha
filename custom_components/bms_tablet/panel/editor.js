@@ -74,6 +74,21 @@ const STATE_LABELS = {
   not_home: "нет дома",
 };
 
+/**
+ * Поля домофона: ключ, подпись, из каких доменов выбирать, пояснение.
+ *
+ * Сами сущности приходят от отдельной интеграции («BMS Intercom»), поэтому
+ * здесь только ссылки — никаких предположений о том, как они называются.
+ * Домены обязаны совпадать с DOORSTATION_ENTITY_KEYS в const.py.
+ */
+const DOORSTATION_FIELDS = [
+  ["camera", "Камера панели", ["camera"], "Видео с вызывной панели."],
+  ["call", "Датчик вызова", ["binary_sensor"], "У него атрибут call_state: idle, ringing, answered."],
+  ["answer", "Кнопка «Ответить»", ["button", "switch", "script"], ""],
+  ["reject", "Кнопка «Сбросить»", ["button", "switch", "script"], ""],
+  ["door", "Кнопка «Открыть дверь»", ["button", "switch", "script"], "На планшете нажимается с удержанием в одну секунду."],
+];
+
 const AMBIENT_MODES = [
   ["never", "Не гаснет"],
   ["timeout", "Через время"],
@@ -323,7 +338,8 @@ class BmsTabletEditor extends HTMLElement {
     const body =
       this._tab === "rooms" ? this._renderRooms()
         : this._tab === "backgrounds" ? this._renderBackgrounds()
-          : this._renderSettings();
+          : this._tab === "doorstation" ? this._renderDoorstation()
+            : this._renderSettings();
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -337,7 +353,7 @@ class BmsTabletEditor extends HTMLElement {
         </header>
         ${this._renderStrip()}
         <div class="tabs">
-          ${[["rooms", "Комнаты и устройства"], ["backgrounds", "Фон и фотографии"], ["tablet", "Планшет"]]
+          ${[["rooms", "Комнаты и устройства"], ["backgrounds", "Фон и фотографии"], ["doorstation", "Домофон"], ["tablet", "Планшет"]]
             .map(([id, label]) =>
               `<div class="tab ${this._tab === id ? "on" : ""}" data-act="tab" data-id="${id}">${label}</div>`)
             .join("")}
@@ -595,6 +611,46 @@ class BmsTabletEditor extends HTMLElement {
 
   // ------------------------------------------------ вкладка «Планшет»
 
+  // ------------------------------------------------- вкладка «Домофон»
+
+  /** Сущности выбранных доменов, по алфавиту, с понятным именем. */
+  _entityOptions(domains) {
+    return Object.keys(this._hass.states)
+      .filter((id) => domains.includes(id.split(".", 1)[0]))
+      .map((id) => [id, this._hass.states[id].attributes.friendly_name || id])
+      .sort((a, b) => a[1].localeCompare(b[1], "ru"));
+  }
+
+  _renderDoorstation() {
+    const door = this._home.doorstation || {};
+    const configured = DOORSTATION_FIELDS.some(([key]) => door[key]);
+
+    return `
+      <p class="hint">Вызывная панель у калитки. Сущности публикует отдельная интеграция
+      «BMS Intercom» — здесь только указывается, какие из них к ней относятся.
+      Когда домофон заведён, звонок открывает экран вызова на всех планшетах дома
+      поверх того, что на них показано, — включая спящий экран.</p>
+      <p class="hint">Любое поле можно оставить пустым. Без камеры планшет всё равно
+      покажет вызов и кнопку «Открыть дверь»: открыть дверь важнее, чем увидеть, кто пришёл.</p>
+
+      <div class="field"><label>Название</label>
+        <div class="val"><input type="text" style="max-width:320px" placeholder="Домофон"
+               value="${esc(door.name || "")}" data-act="door-name"></div></div>
+
+      ${DOORSTATION_FIELDS.map(([key, label, domains, hint]) => `
+        <div class="field"><label>${esc(label)}</label>
+          <div class="val"><select data-act="door-entity" data-id="${key}">
+            <option value="">— не выбрано —</option>
+            ${this._entityOptions(domains).map(([id, name]) =>
+              `<option value="${esc(id)}" ${door[key] === id ? "selected" : ""}>${esc(name)} · ${esc(id)}</option>`).join("")}
+          </select>${hint ? ` <small class="hint">${esc(hint)}</small>` : ""}</div></div>`).join("")}
+
+      ${configured ? `<p class="hint">Двусторонний звук («Говорить») пока не включён: кнопка на планшете
+      видна, но подписана «Скоро».</p>
+      <button class="danger" data-act="door-clear">Убрать домофон</button>` :
+      `<p class="hint">Домофон не заведён — планшеты работают как раньше.</p>`}`;
+  }
+
   _renderSettings() {
     const home = this._home;
     const ambient = home.ambient || {};
@@ -714,6 +770,10 @@ class BmsTabletEditor extends HTMLElement {
         this._render();
         return this._upload(`__home__${n}`);
       }
+      if (act === "door-clear") {
+        if (!confirm("Убрать домофон? Планшеты перестанут показывать вызов.")) return;
+        return this._enqueue(() => this._patchHome({ doorstation: null }));
+      }
       if (act === "reset") return this._reset();
       if (act === "create-area") return this._createArea();
     });
@@ -785,6 +845,8 @@ class BmsTabletEditor extends HTMLElement {
       }
       if (act === "blur") return this._ws("background/set", { area_id: id, blur: target.value / 100 }).then(() => this._reload());
       if (act === "dim") return this._ws("background/set", { area_id: id, dim: target.value / 100 }).then(() => this._reload());
+      if (act === "door-entity") return this._patchHome({ doorstation: { [id]: target.value || "" } });
+      if (act === "door-name") return this._patchHome({ doorstation: { name: target.value.trim() || null } });
       if (act === "name") return this._patchHome({ name: target.value });
       if (act === "start-area") return this._patchHome({ start_area: target.value || null });
       if (act === "ambient-mode") return this._patchHome({ ambient: { mode: target.value } });

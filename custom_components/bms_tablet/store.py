@@ -20,7 +20,7 @@ import asyncio
 import logging
 from copy import deepcopy
 from functools import wraps
-from .validation import background_key, validate_home_patch, number
+from .validation import background_key, validate_doorstation, validate_home_patch, number
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -204,6 +204,20 @@ class BmsTabletStore:
             if key in patch:
                 home[key] = patch[key]
 
+        # Домофон правится по одному полю: редактор шлёт только тот выпадающий
+        # список, который тронули. None стирает домофон целиком.
+        if "doorstation" in patch:
+            if patch["doorstation"] is None:
+                home.pop("doorstation", None)
+            else:
+                merged = dict(home.get("doorstation") or {})
+                merged.update(patch["doorstation"])
+                cleaned = validate_doorstation(merged)
+                if cleaned:
+                    home["doorstation"] = cleaned
+                else:
+                    home.pop("doorstation", None)
+
         if "ambient" in patch and isinstance(patch["ambient"], dict):
             ambient = dict(DEFAULT_AMBIENT)
             ambient.update(home.get("ambient") or {})
@@ -231,6 +245,10 @@ class BmsTabletStore:
         """Сбросить правки комнат — вернуться к чистому автоопределению."""
         old = self._data["home"]
         fresh = default_home(old.get("name"))
+        # Домофон — не правка комнаты, а отдельное устройство объекта: сброс
+        # автоопределения не должен заставлять монтажника заводить его заново.
+        if old.get("doorstation"):
+            fresh["doorstation"] = old["doorstation"]
         fresh["revision"] = int(old.get("revision", 0)) + 1
         self._data["home"] = fresh
         await self._async_save()

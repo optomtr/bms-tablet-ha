@@ -19,6 +19,8 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import floor_registry as fr
 
+from .const import DEFAULT_DOORSTATION_NAME, DOORSTATION_ENTITY_KEYS
+
 # «пол» отдельным словом: ловит «Тёплый пол» и «floor»,
 # но не «полотенцесушитель» и не «потолок».
 FLOOR_WORD = re.compile(
@@ -421,4 +423,25 @@ def async_room_payload(
         )
 
     payload.sort(key=lambda room: (room["order"], room["name"].lower()))
+    return payload
+
+
+@callback
+def async_doorstation_payload(home: dict[str, Any]) -> dict[str, Any] | None:
+    """Домофон в том виде, в каком его читает планшет. None — домофона нет.
+
+    Ключ в конфиге дома, а не в комнате: панель у калитки одна на объект, и
+    звонок с неё должен поднять любой планшет, в какой бы комнате он ни висел.
+
+    Сущности отдаём как записаны, даже если сейчас их в Home Assistant нет:
+    после перезапуска камера поднимается позже нас, и вычеркнуть её означало
+    бы на полминуты оставить хозяина без кнопки «Открыть дверь».
+    """
+    stored = home.get("doorstation")
+    if not isinstance(stored, dict):
+        return None
+    payload = {key: stored[key] for key in DOORSTATION_ENTITY_KEYS if stored.get(key)}
+    if not payload:
+        return None
+    payload["name"] = stored.get("name") or DEFAULT_DOORSTATION_NAME
     return payload
