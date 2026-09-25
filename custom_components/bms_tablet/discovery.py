@@ -36,7 +36,7 @@ TV_WORDS = ("телевизор", "тв", "tv", "телек", "приставк"
 FAN_WORDS = ("вентил", "вытяж", "проветр", "рекуперат", "fan", "vent", "hood", "exhaust")
 IRRIGATION_WORDS = ("полив", "орошен", "капель", "sprinkler", "irrigation", "drip")
 
-SUPPORTED_DOMAINS = ("light", "switch", "valve", "fan", "media_player", "climate", "cover", "sensor")
+SUPPORTED_DOMAINS = ("light", "switch", "valve", "fan", "media_player", "climate", "cover", "sensor", "camera")
 
 
 def is_floor_related(name: str) -> bool:
@@ -149,6 +149,9 @@ def auto_role(
         return climate_role(friendly_name)
     if domain == "cover":
         return "cover"
+    # Камеры зоны — на планшет: «Камеры» в разделах и живое видео по касанию.
+    if domain == "camera":
+        return "camera"
     if domain == "sensor":
         if device_class == "temperature":
             return "sensor_floor_temp" if is_floor_related(friendly_name) else "sensor_air_temp"
