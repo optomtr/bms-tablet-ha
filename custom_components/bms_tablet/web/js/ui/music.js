@@ -13,6 +13,7 @@ export function musicPage(speakers, g, ctx) {
   const out = [h('div.grid', { style: `--cols:${g.columns}`, 'data-key': 'speakers' }, cards)];
   if (ctx.ui.radio) out.push(radioSheet(ctx.ui.radio, speakers));
   if (ctx.ui.multiroom) out.push(multiroomSheet(ctx.ui.multiroom, speakers));
+  if (ctx.ui.find) out.push(searchSheet(ctx.ui.find, speakers));
   return out;
 }
 
@@ -37,7 +38,13 @@ function speakerCard(s, all, ctx) {
   if (s.presets > 0) {
     parts.push(h('div.choice', h('div.l', 'Пресеты')));
     parts.push(h('div.tiles', { style: '--per-row:3' }, Array.from({ length: s.presets }, (_, i) =>
-      actionButton(String(i + 1), { enabled: live, act: act('Preset', s.id, { number: i + 1 }) }))));
+      actionButton(String(i + 1), { enabled: live, act: act('Preset', s.presetEntity ?? s.id, { number: i + 1 }) }))));
+  }
+  // Music Assistant: поиск музыки и его медиатека.
+  if (s.assistant) {
+    parts.push(h('div.row2',
+      actionButton('Найти музыку', { iconName: 'ic_music', enabled: live, act: { ui: 'find-open', id: s.id } }),
+      canBrowse(s) ? actionButton('Медиатека', { iconName: 'ic_grid', enabled: live, act: { ui: 'library', id: s.id } }) : null));
   }
   const radio = canBrowse(s);
   if (radio || canSource(s)) {
@@ -110,4 +117,31 @@ function multiroomSheet(mr, speakers) {
         actionButton('Все', { act: { ui: 'mr-all', members: partners.map((p) => p.id) } }),
         actionButton('Никого', { act: { ui: 'mr-none' } }),
         actionButton('Готово', { iconName: 'ic_speaker', on: true, act: { ui: 'mr-done' } }))));
+}
+
+/** «Найти музыку»: поле, «Найти», находки по разделам; касание играет на колонке. */
+function searchSheet(find, speakers) {
+  const s = speakers.find((x) => x.id === find.id);
+  let body;
+  if (find.loading) body = h('div.empty', 'Ищем…');
+  else if (!find.query) body = h('div.empty', 'Напишите, что включить, и нажмите «Найти»');
+  else if (!find.result) body = h('div.empty', 'Music Assistant не ответил');
+  else if (!find.result.some((sec) => sec.hits.length)) body = h('div.empty', 'Ничего не нашлось');
+  else {
+    body = h('div.radio-list', find.result.filter((sec) => sec.hits.length).flatMap((sec) => [
+      h('div.together', { 'data-key': 'fs:' + sec.title }, sec.title),
+      ...sec.hits.map((hit) => press('radio-item', {
+        key: 'fh:' + hit.uri, label: hit.title,
+        act: { ui: 'find-play', id: find.id, uri: hit.uri, mediaType: hit.mediaType },
+      }, icon('ic_music'), h('span.t', hit.title, hit.subtitle ? h('small', ' · ' + hit.subtitle) : null), h('span.play', 'Играть'))),
+    ]));
+  }
+  return h('div.sheet-back', { 'data-key': 'find', 'data-act': JSON.stringify({ ui: 'find-close' }) },
+    h('section.card.sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
+      h('div.card-head', h('div.title', 'Найти музыку', h('small', `Играть на: ${s?.name ?? ''}`)),
+        actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'find-close' } })),
+      h('form.row2', { 'data-search-form': '1' },
+        h('input.search', { 'data-search-field': '1', type: 'search', enterkeyhint: 'search', placeholder: 'Песня, исполнитель, альбом…', 'aria-label': 'Что найти', autocomplete: 'off' }),
+        actionButton('Найти', { iconName: 'ic_music', on: true, act: { ui: 'find-run' } })),
+      body));
 }

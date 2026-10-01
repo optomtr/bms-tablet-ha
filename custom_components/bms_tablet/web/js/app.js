@@ -241,6 +241,13 @@ function uiCommand(act) {
   }
 }
 
+// Поиск музыки: Enter на клавиатуре iPad («Найти») — как кнопка «Найти».
+root.addEventListener('submit', (event) => {
+  if (!event.target.closest('[data-search-form]')) return;
+  event.preventDefault();
+  musicUiCommand({ ui: 'find-run' });
+});
+
 root.addEventListener('change', (event) => {
   const select = event.target.closest('select[data-choice]');
   if (!select) return;

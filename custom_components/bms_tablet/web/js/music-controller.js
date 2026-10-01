@@ -1,7 +1,7 @@
 // Музыка: команды колонкам, окно радио, мультирум, громкость пальцем, реестры.
 // Отдельно от app.js — тот же порядок, что у раздела «Музыка» Android-планшета.
 
-import { musicCall, parseMediaFolder, radioRoot, RADIO_ROOT, multiroomActions } from './model/music.js';
+import { musicCall, parseMediaFolder, radioRoot, RADIO_ROOT, multiroomActions, parseAssistantSearch } from './model/music.js';
 
 let deps = null; // {conn: () => connection, ui, render, findSpeaker}
 
@@ -18,6 +18,11 @@ export function musicUiCommand(act) {
   const { ui, render } = deps;
   switch (act.ui) {
     case 'radio': openRadio(act.id); return true;
+    case 'library': openRadio(act.id, [null, null, 'Медиатека']); return true;
+    case 'find-open': ui.find = { id: act.id, query: '', result: null, loading: false }; render(); return true;
+    case 'find-close': ui.find = null; render(); return true;
+    case 'find-run': runSearch(); return true;
+    case 'find-play': ui.find = null; render(); sendMusic({ type: 'PlayAssistant', id: act.id, uri: act.uri, mediaType: act.mediaType }); return true;
     case 'radio-open': browseRadio([...ui.radio.path, [act.contentId, act.contentType, act.title]]); return true;
     case 'radio-back': if (ui.radio.path.length > 1) browseRadio(ui.radio.path.slice(0, -1)); else closeRadio(); return true;
     case 'radio-close': closeRadio(); return true;
@@ -46,8 +51,8 @@ export function musicUiCommand(act) {
   }
 }
 
-function openRadio(id) {
-  deps.ui.radio = { id, path: [[RADIO_ROOT, 'music', 'Радио']], folder: null, loading: true };
+function openRadio(id, root = [RADIO_ROOT, 'music', 'Радио']) {
+  deps.ui.radio = { id, path: [root], folder: null, loading: true };
   browseRadio(deps.ui.radio.path);
 }
 
@@ -65,12 +70,41 @@ async function browseRadio(path) {
   const [contentId, contentType] = path[path.length - 1];
   let folder = null;
   try {
-    folder = parseMediaFolder(await deps.conn().sendMessage({ type: 'media_player/browse_media', entity_id: radio.id, media_content_id: contentId, media_content_type: contentType }));
+    const msg = { type: 'media_player/browse_media', entity_id: radio.id };
+    if (contentId) Object.assign(msg, { media_content_id: contentId, media_content_type: contentType ?? '' });
+    folder = parseMediaFolder(await deps.conn().sendMessage(msg));
     if (folder && contentId === RADIO_ROOT) folder = radioRoot(folder);
   } catch { folder = null; }
   if (deps.ui.radio !== radio || radio.path !== path) return; // уже ушли в другую папку
   radio.folder = folder;
   radio.loading = false;
+  deps.render();
+}
+
+let assistantEntry = null;
+
+/** Поиск в Music Assistant: строку берём из поля окна, ответ — по разделам. */
+async function runSearch() {
+  const find = deps.ui.find;
+  const input = document.querySelector('[data-search-field]');
+  const query = (input?.value ?? '').trim();
+  if (!find || !query) return;
+  find.query = query;
+  find.loading = true;
+  deps.render();
+  let result = null;
+  try {
+    const conn = deps.conn();
+    assistantEntry ??= (await conn.sendMessage({ type: 'config_entries/get', domain: 'music_assistant' }))?.[0]?.entry_id ?? null;
+    if (assistantEntry) {
+      const answer = await conn.sendMessage({ type: 'call_service', domain: 'music_assistant', service: 'search', return_response: true,
+        service_data: { config_entry_id: assistantEntry, name: query, limit: 10 } });
+      result = parseAssistantSearch(answer?.response);
+    }
+  } catch { result = null; }
+  if (deps.ui.find !== find) return;
+  find.result = result;
+  find.loading = false;
   deps.render();
 }
 

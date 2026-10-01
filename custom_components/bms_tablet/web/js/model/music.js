@@ -35,12 +35,27 @@ export function buildSpeakers(states, registry = null) {
   const candidates = inputs.filter(({ platform, st }) => !NOT_SPEAKERS.has(platform)
     && st.attributes?.device_class !== 'tv'
     && toggleKindOf('media_player', nameOf(st), null) !== 'TV');
+  // Music Assistant стоит — колонки это его плееры (очередь, поиск, медиатека);
+  // пресеты остаются у LinkPlay-двойника с тем же именем.
+  const assistant = candidates.filter((c) => c.platform === ASSISTANT);
+  if (assistant.length) {
+    const twins = new Map(candidates.filter((c) => c.platform !== ASSISTANT && PRESETS[c.platform])
+      .map((c) => [norm(nameOf(c.st)), c]));
+    return assistant.map((c) => {
+      const twin = twins.get(norm(nameOf(c.st)));
+      return { ...speakerFrom(c), assistant: true, presets: twin ? PRESETS[twin.platform] : 0, presetEntity: twin?.id ?? null, room: c.room ?? twin?.room ?? null };
+    }).sort(order);
+  }
   const rich = candidates.some((c) => c.platform && c.platform !== DLNA);
-  return candidates.filter((c) => !rich || c.platform !== DLNA).map(speakerFrom).sort((a, b) =>
-    (isAvailable(a) === isAvailable(b) ? 0 : isAvailable(a) ? -1 : 1)
-    || collator.compare(a.room ?? '￿', b.room ?? '￿')
-    || collator.compare(a.name, b.name));
+  return candidates.filter((c) => !rich || c.platform !== DLNA).map(speakerFrom).sort(order);
 }
+
+const order = (a, b) => (isAvailable(a) === isAvailable(b) ? 0 : isAvailable(a) ? -1 : 1)
+  || collator.compare(a.room ?? '\uFFFF', b.room ?? '\uFFFF')
+  || collator.compare(a.name, b.name);
+const norm = (name) => name.toLowerCase().replaceAll('ё', 'е').trim();
+/** Плееры Music Assistant в Home Assistant. */
+export const ASSISTANT = 'music_assistant';
 
 const nameOf = (st) => st.attributes?.friendly_name || st.entity_id.split('.')[1];
 
@@ -57,6 +72,8 @@ function speakerFrom({ id, platform, room, st }) {
     group: Array.isArray(a.group_members) ? a.group_members : [],
     features: Number(a.supported_features) || 0,
     presets: PRESETS[platform] ?? 0,
+    presetEntity: PRESETS[platform] ? id : null,
+    assistant: false,
   };
 }
 
@@ -90,6 +107,7 @@ export function musicCall(action) {
     case 'Play': return { domain: 'media_player', service: 'play_media', service_data: { media_content_id: action.contentId, media_content_type: action.contentType }, target };
     case 'Join': return { domain: 'media_player', service: 'join', service_data: { group_members: action.members.filter((m) => m !== action.id) }, target };
     case 'Unjoin': return { domain: 'media_player', service: 'unjoin', service_data: {}, target };
+    case 'PlayAssistant': return { domain: 'music_assistant', service: 'play_media', service_data: { media_id: action.uri, media_type: action.mediaType, enqueue: 'play' }, target };
     default: throw new Error('unknown music action ' + action.type);
   }
 }
@@ -134,4 +152,20 @@ export function groupPartners(speaker, all) {
     ids = leader ? leader.group.filter((g) => g !== speaker.id) : [];
   }
   return all.filter((o) => ids.includes(o.id)).map((o) => o.name);
+}
+
+const SEARCH_SECTIONS = [['tracks', 'Песни'], ['albums', 'Альбомы'], ['playlists', 'Плейлисты'], ['artists', 'Исполнители'], ['radio', 'Радио']];
+
+/** Ответ music_assistant.search → [{title, hits:[{title, subtitle, uri, mediaType}]}]. */
+export function parseAssistantSearch(response) {
+  if (!response) return [];
+  return SEARCH_SECTIONS.map(([key, title]) => ({
+    title,
+    hits: (response[key] ?? []).filter((o) => o?.uri).map((o) => ({
+      title: o.name || o.uri,
+      subtitle: (o.artists ?? []).map((a) => a?.name).filter(Boolean).join(', ') || null,
+      uri: o.uri,
+      mediaType: o.media_type || key.replace(/s$/, ''),
+    })),
+  }));
 }
