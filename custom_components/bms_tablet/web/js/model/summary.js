@@ -2,7 +2,7 @@
 // Порт ui/premium/HomeSummary.kt, PageModel/selectedRooms/pageTitle из PremiumHome.kt, model/Format.kt.
 import { CLIMATE_KIND, CLIMATE_KIND_ORDER, roomFans, roomIrrigation, roomMedia, hasSpeed, sensorsEmpty, roomLightsOn } from './devices.js';
 import {
-  zoneOf, zones, zoneLabel, roomPages, pageOf, pageRooms, isGateCover, isCurtain, isFloorHeatingRelay,
+  zoneOf, zones, zoneLabel, zoneTitle, roomPages, pageOf, pageRooms, isGateCover, isCurtain, isFloorHeatingRelay,
   lightSections, roomLayout,
 } from './navigation.js';
 
@@ -134,7 +134,7 @@ export function selectedRooms(rooms, route) {
 export function pageTitle(route, selected, homeName) {
   if (route === 'home') return homeName ?? 'Мой дом';
   if (route.startsWith('room:')) return selected.length ? pageOf(selected[0]) : '';
-  if (route.startsWith('zone:')) return zoneLabel(after(route));
+  if (route.startsWith('zone:')) return zoneTitle(after(route));
   if (route.includes(':')) return after(route);
   return route;
 }
@@ -167,7 +167,7 @@ export function pageModel(rooms, selected) {
   lazy(m, 'heating', () => {
     const groups = new Map();
     for (const room of rooms) for (const device of room.climates.filter((c) => !CLIMATE_KIND[c.kind].isCold)) {
-      const title = `${CLIMATE_KIND[device.kind].title} · ${zoneLabel(zoneOf(room))}`;
+      const title = `${CLIMATE_KIND[device.kind].title} · ${zoneTitle(zoneOf(room))}`;
       if (!groups.has(title)) groups.set(title, []);
       groups.get(title).push({ room, device });
     }

@@ -80,6 +80,33 @@ export function mainZone(rooms) {
 }
 
 /** Этажи — по номеру и первыми, дальше подвал, терраса, двор, бассейн. */
+/**
+ * Здание этажа: имя этажа без самого этажа. «Гостевой Дом 1 этаж» → «Гостевой Дом»,
+ * «1-этаж» → "" (главное здание). Не этаж (подвал, двор) — главное здание.
+ */
+export function buildingOf(zone) {
+  if (floorNumberOf(zone) === null) return '';
+  return zone.trim().split(/[\s\-–—_.,·]+/).filter(Boolean).filter((w) => {
+    const c = clean(w);
+    return !(c.startsWith('этаж') || c === 'floor' || /^-?\d+(-?(й|ой|ий|ый|ая|я))?$/.test(c)
+      || ordinals.some(([stem]) => c.startsWith(stem)));
+  }).join(' ');
+}
+
+/** Подпись главного здания, когда зданий несколько. */
+export const MAIN_BUILDING = 'Главный дом';
+
+/** Здания по порядку: главное первым, остальные по имени. */
+export function buildings(rooms) {
+  return distinct(zones(rooms).map(buildingOf)).sort((a, b) => (a !== '') - (b !== '') || cmp(a, b));
+}
+
+/** Полное имя зоны для заголовков: «Гостевой Дом · 1 этаж». */
+export function zoneTitle(zone) {
+  const b = buildingOf(zone);
+  return b ? `${b} · ${zoneLabel(zone)}` : zoneLabel(zone);
+}
+
 export function zones(rooms) {
   const order = ['Подвал', 'Терраса', 'Двор', 'Бассейн'];
   const rank = (z) => floorNumberOf(z) ?? 1000 + (order.indexOf(z) < 0 ? 99 : order.indexOf(z));

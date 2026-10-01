@@ -7,7 +7,7 @@ import {
 } from './components.js';
 import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard } from './controls.js';
 import { roomCard } from './photos.js';
-import { zoneLabel, roomPages, pageKey, pageOf, isCurtain } from '../model/navigation.js';
+import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
 import { climatesOn, climatesOff, relaysSet, lightsSet, curtainsCommand } from '../model/actions.js';
@@ -37,7 +37,7 @@ export function renderPage(route, rooms, selected, ctx) {
   const model = pageModel(rooms, selected);
   const g = ctx.grid;
   if (!rooms.length) return [h('div.empty', 'В доме пока нет устройств. Их добавляют в Home Assistant: «BMS Планшеты».')];
-  if (route === 'home') return homePage(model, ctx);
+  if (route === 'home') return homePage(model, { ...ctx, rooms });
   const title = ctx.title;
   if (route.startsWith('zone:') && !['Терраса', 'Двор', 'Бассейн'].includes(title)) return floorPage(selected, title, ctx);
   const outdoor = ctx.weather?.temperature ?? null;
@@ -61,8 +61,8 @@ function homePage(model, ctx) {
   const sectionCols = ctx.grid.phone ? ctx.grid.navColumnsFor(sections.length) : (ctx.grid.columns >= 3 ? 4 : sections.length);
   return [
     h('div.stats', { 'data-key': 'stats' }, stats),
-    sectionTitle('Зоны дома'),
-    grid(zoneCols, model.zoneList.map(zoneRow), 'zones'),
+    // Несколько зданий (дача: главный и гостевой дом) — по разделу на здание.
+    ...houseSections(ctx.rooms, model.zoneList, zoneCols),
     sectionTitle('Управление'),
     // Стрелка — только на широкой плитке: в портрете без неё «Отопление» не рвётся.
     grid(sectionCols, sections.map((label) => navTile(label, SECTION_ICON[label], label, 'nav:' + label, roomy(ctx.grid))), 'sections'),
@@ -70,6 +70,14 @@ function homePage(model, ctx) {
 }
 
 const roomy = (g) => !g.phone && (g.cardWidth - 16) / 2 >= 190;
+
+function houseSections(rooms, rows, cols) {
+  const houses = buildings(rooms);
+  return houses.flatMap((house) => [
+    sectionTitle(houses.length < 2 ? 'Зоны дома' : house || MAIN_BUILDING, 'house:' + house),
+    grid(cols, rows.filter((r) => buildingOf(r.zone) === house).map(zoneRow), 'zones:' + house),
+  ]);
+}
 
 const SECTION_ICON = { 'Свет': 'ic_light', 'Климат': 'ic_fan', 'Отопление': 'ic_radiator', 'Шторы': 'ic_curtain' };
 
