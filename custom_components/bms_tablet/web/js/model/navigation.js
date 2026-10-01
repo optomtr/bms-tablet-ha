@@ -114,12 +114,19 @@ export function zones(rooms) {
 }
 
 /**
- * Карточки этажа. Каждая зона HA — полноценная комната, мелкого ряда нет;
+ * Карточки этажа и ряд «Прочие помещения»: санузлы внизу, остальные зоны — карточками;
  * порядок демо-дома — только сортировка.
  */
 export function floorSplit(pages, order) {
   const rank = (room) => { const i = order.indexOf(room.originalName ?? pageOf(room)); return i < 0 ? Infinity : i; };
-  return { featured: [...pages].sort((a, b) => (rank(a) === rank(b) ? 0 : rank(a) < rank(b) ? -1 : 1)), others: [] };
+  const sorted = [...pages].sort((a, b) => (rank(a) === rank(b) ? 0 : rank(a) < rank(b) ? -1 : 1));
+  return { featured: sorted.filter((r) => !isUtilityRoom(r)), others: sorted.filter(isUtilityRoom) };
+}
+
+/** Санузел и туалет — маленькой плиткой внизу этажа (владелец, 01.10.2026). */
+export function isUtilityRoom(room) {
+  const name = clean(pageOf(room));
+  return ['санузел', 'туалет', 'с/у', 'wc'].some((w) => name.includes(w));
 }
 
 /** Разделитель подзоны в имени: «Летняя кухня · Споты». */

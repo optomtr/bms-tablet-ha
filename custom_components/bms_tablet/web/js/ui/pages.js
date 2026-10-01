@@ -7,7 +7,7 @@ import {
 } from './components.js';
 import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard } from './controls.js';
 import { roomCard } from './photos.js';
-import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING } from '../model/navigation.js';
+import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
 import { climatesOn, climatesOff, relaysSet, lightsSet, curtainsCommand } from '../model/actions.js';
@@ -102,18 +102,31 @@ function zoneRow(row) {
 
 /** Страница этажа: карточки комнат с фото (FloorOverview). */
 function floorPage(rooms, title, ctx) {
-  const pages = roomPages(rooms);
+  const { featured, others } = floorSplit(roomPages(rooms), []);
   const out = [];
-  if (pages.length) {
+  if (featured.length) {
     out.push(sectionTitle('Комнаты'));
     out.push(grid(ctx.grid.phone ? 2 : ctx.grid.columns,
-      pages.map((room) => roomCard(room, 'room:' + pageKey(room), pageOf(room), ctx)), 'rooms'));
+      featured.map((room) => roomCard(room, 'room:' + pageKey(room), pageOf(room), ctx)), 'rooms'));
   }
-  if (title === 'Подвал') {
+  // Санузлы — маленькими плитками внизу (как FloorOverview на планшете).
+  const small = others.map((room) => navTile(pageOf(room), utilityIcon(pageOf(room)), 'room:' + pageKey(room), 'other:' + room.id, roomy(ctx.grid)));
+  if (title === 'Подвал') small.push(navTile('Отопление', 'ic_radiator', 'Отопление', 'nav:heat', roomy(ctx.grid)));
+  if (small.length) {
     out.push(sectionTitle('Прочие помещения'));
-    out.push(grid(ctx.grid.navColumnsFor(1), [navTile('Отопление', 'ic_radiator', 'Отопление', 'nav:heat', roomy(ctx.grid))], 'others'));
+    out.push(grid(ctx.grid.navColumnsFor(small.length), small, 'others'));
   }
   return out;
+}
+
+function utilityIcon(name) {
+  const n = name.toLowerCase();
+  if (n.includes('лестниц')) return 'premium_stairs';
+  if (n.includes('санузел') || n.includes('туалет')) return 'premium_bath';
+  if (n.includes('гардероб')) return 'premium_wardrobe';
+  if (n.includes('кладов')) return 'premium_storage';
+  if (n.includes('постир')) return 'premium_laundry';
+  return 'premium_home';
 }
 
 /** Ряд карточек как cardRows: CSS-сетка сама ровняет высоту ряда. */
