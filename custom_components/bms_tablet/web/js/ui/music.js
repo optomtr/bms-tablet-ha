@@ -3,65 +3,112 @@
 
 import { h, icon } from './dom.js';
 import { press, group, actionButton, emptySection } from './components.js';
-import { F, can, canPlayPause, canSource, canBrowse, isAvailable, isPlaying, nowPlaying, groupPartners } from '../model/music.js';
+import { F, can, canPlayPause, canBrowse, isAvailable, isPlaying, nowPlaying, trackTitle, groupLeader, groupFollowers, joinTargets } from '../model/music.js';
+import { art } from '../model/radio.js';
 
 export const MUSIC = 'Музыка';
 
 export function musicPage(speakers, g, ctx) {
   if (!speakers.length) return [emptySection()];
+  settlePending(speakers, ctx.ui);
   const cards = speakers.map((s) => speakerCard(s, speakers, ctx));
   const out = [h('div.grid', { style: `--cols:${g.columns}`, 'data-key': 'speakers' }, cards)];
-  if (ctx.ui.radio) out.push(radioSheet(ctx.ui.radio, speakers));
-  if (ctx.ui.multiroom) out.push(multiroomSheet(ctx.ui.multiroom, speakers));
+  if (ctx.ui.radio) out.push(mediaSheet(ctx.ui.radio, speakers));
   if (ctx.ui.find) out.push(searchSheet(ctx.ui.find, speakers));
   return out;
 }
 
+/** Колонка перешла в другую группу (сменилась ведущая) — «Подключаем…» больше не нужно. */
+function settlePending(speakers, ui) {
+  for (const [id, p] of Object.entries(ui.mrPending ?? {})) {
+    const s = speakers.find((x) => x.id === id);
+    if (!s || (groupLeader(s, speakers)?.id ?? null) !== p.leaderBefore) delete ui.mrPending[id];
+  }
+}
+
 const act = (type, id, extra = {}) => ({ music: { type, id, ...extra } });
 
+/**
+ * Карточка колонки: обложка и что играет, громкость, радио и поиск, мультирум.
+ * Ведомая колонка группы показывает то, что играет ведущая, и кнопку «отключить».
+ */
 function speakerCard(s, all, ctx) {
   const live = isAvailable(s) && ctx.live;
-  const playing = isPlaying(s);
-  const action = canPlayPause(s) ? press('bulb-btn', {
-    on: playing, enabled: live, act: act('PlayPause', s.id), label: `${playing ? 'Пауза' : 'Играть'} · ${s.name}`,
+  const leader = groupLeader(s, all);
+  const follower = !!leader && leader.id !== s.id;
+  const shown = follower ? leader : s;
+  const playing = isPlaying(shown);
+  const action = canPlayPause(shown) ? press('bulb-btn', {
+    on: playing, enabled: live, act: act('PlayPause', shown.id), label: `${playing ? 'Пауза' : 'Играть'} · ${s.name}`,
   }, icon(playing ? 'ic_media_pause' : 'ic_media_play')) : null;
-  const parts = [
-    h('div.now', h('span.cover', s.picture ? h('img', { src: s.picture, alt: '' }) : icon('ic_music')),
-      h('span.text', h('span.what', { class: playing ? 'on' : '' }, nowPlaying(s)), s.room ? h('span.room', s.room) : null)),
-  ];
-  if (can(s, F.PREVIOUS_TRACK) || can(s, F.NEXT_TRACK)) {
+  const together = follower ? `Вместе с «${leader.name}»`
+    : leader ? 'Также в: ' + groupFollowers(s, all).map((o) => o.name).join(', ') : null;
+  const parts = [nowBlock(shown, s.room, together, ctx)];
+  if (!follower && (can(s, F.PREVIOUS_TRACK) || can(s, F.NEXT_TRACK))) {
     parts.push(h('div.row2',
       can(s, F.PREVIOUS_TRACK) ? actionButton('Назад', { iconName: 'ic_media_prev', enabled: live, act: act('Previous', s.id) }) : null,
       can(s, F.NEXT_TRACK) ? actionButton('Дальше', { iconName: 'ic_media_next', enabled: live, act: act('Next', s.id) }) : null));
   }
   if (can(s, F.VOLUME_SET) && s.volume != null) parts.push(volume(s, live, ctx));
-  if (s.presets > 0) {
-    parts.push(h('div.choice', h('div.l', 'Пресеты')));
-    parts.push(h('div.tiles', { style: '--per-row:3' }, Array.from({ length: s.presets }, (_, i) =>
-      actionButton(String(i + 1), { enabled: live, act: act('Preset', s.presetEntity ?? s.id, { number: i + 1 }) }))));
-  }
-  // Music Assistant: поиск музыки и его медиатека.
-  if (s.assistant) {
+  // Что включить — у ведомой нет: она играет то же, что ведущая.
+  const canRadio = !follower && can(s, F.PLAY_MEDIA);
+  const canFind = !follower && s.assistant;
+  if (canRadio || canFind) {
     parts.push(h('div.row2',
-      actionButton('Найти музыку', { iconName: 'ic_music', enabled: live, act: { ui: 'find-open', id: s.id } }),
-      canBrowse(s) ? actionButton('Медиатека', { iconName: 'ic_grid', enabled: live, act: { ui: 'library', id: s.id } }) : null));
+      canRadio ? actionButton('Радио', { iconName: 'ic_radio', enabled: live, act: { ui: 'radio', id: s.id } }) : null,
+      canFind ? actionButton('Поиск', { iconName: 'ic_music', enabled: live, act: { ui: 'find-open', id: s.id } }) : null,
+      canFind && canBrowse(s) ? actionButton('Медиатека', { iconName: 'ic_grid', enabled: live, act: { ui: 'library', id: s.id } }) : null));
   }
-  const radio = canBrowse(s);
-  if (radio || canSource(s)) {
-    parts.push(h('div.row2',
-      radio ? actionButton('Радио', { iconName: 'ic_radio', enabled: live, act: { ui: 'radio', id: s.id } }) : null,
-      canSource(s) ? h('div.press.action.select', { class: live ? '' : 'off-line' }, icon('ic_grid'), h('span', s.source ?? 'Вход'),
-        h('select', { 'aria-label': 'Вход · ' + s.name, disabled: !live, 'data-choice': JSON.stringify({ music: 'Source', id: s.id }), 'data-value': s.source ?? '' },
-          (s.source ? [] : [h('option', { value: '', selected: true }, 'Вход')]).concat(s.sources.map((src) => h('option', { value: src, selected: src === s.source }, src))))) : null));
-  }
-  // Мультирум: с кем играет вместе и выбор комнат.
-  const partners = all.filter((o) => o.id !== s.id && isAvailable(o) && can(o, F.GROUPING));
-  if (can(s, F.GROUPING) && partners.length) {
-    const together = groupPartners(s, all);
-    if (together.length) parts.push(h('div.together', `Играет вместе с: ${together.join(', ')}`));
-    parts.push(actionButton('Мультирум', { iconName: 'ic_speaker', on: together.length > 0, enabled: live, act: { ui: 'mr-open', id: s.id } }));
-  }
+  parts.push(...groupButtons(s, all, leader, live, ctx));
   return group(s.name, { action, key: 'speaker:' + s.id }, ...parts);
+}
+
+/** Обложка и что играет. Радио по адресу: имя и значок станции, включённой с планшета. */
+function nowBlock(shown, room, together, ctx) {
+  const station = isPlaying(shown) && !trackTitle(shown) ? ctx.ui.stations?.[shown.id] ?? null : null;
+  const picture = station?.thumbnail ?? (trackTitle(shown) ? shown.picture : null);
+  const playing = isPlaying(shown);
+  return h('div.now',
+    artTile(picture, station ? '📻' : null, station?.title ?? shown.name, { cls: 'cover', fit: !!station, placeholder: playing ? 'ic_music' : 'ic_speaker' }),
+    h('span.text',
+      h('span.what', { class: playing ? 'on' : '' }, station?.title ?? nowPlaying(shown)),
+      station ? h('span.room', 'Интернет-радио') : null,
+      together ? h('span.together', together) : null,
+      room ? h('span.room', room) : null));
+}
+
+/**
+ * Мультирум одним касанием: одиночная колонка — «Слушать с «1 sound»», ведомая —
+ * «Отключить». Пока колонки переходят, кнопка говорит «Подключаем…» и не
+ * принимает касаний: лишняя команда у LinkPlay — пересинхронизация и пропавший звук.
+ */
+function groupButtons(s, all, leader, live, ctx) {
+  if (!can(s, F.GROUPING)) return [];
+  const pending = ctx.ui.mrPending?.[s.id];
+  if (leader && leader.id !== s.id) {
+    return [actionButton(pending ? 'Отключаем…' : `Отключить от «${leader.name}»`, {
+      iconName: 'ic_close', enabled: live && !pending, key: 'mr-leave:' + s.id, act: { ui: 'mr-leave', id: s.id, leader: leader.id },
+    })];
+  }
+  if (leader) return [];
+  return joinTargets(s, all).slice(0, 2).map((t) => actionButton(pending?.target === t.id ? 'Подключаем…' : `Слушать с «${t.name}»`, {
+    iconName: 'ic_speaker', on: pending?.target === t.id, enabled: live && !pending, key: 'mr-join:' + s.id + ':' + t.id,
+    act: { ui: 'mr-join', id: s.id, target: t.id },
+  }));
+}
+
+const ART_COLORS = ['#3A3326', '#26332E', '#2C2E3A', '#3A2A2A', '#33302A', '#2A3338'];
+const hash = (text) => [...text].reduce((n, ch) => (n * 31 + ch.codePointAt(0)) | 0, 0);
+
+/**
+ * Плитка-картинка: снимок по адресу поверх эмодзи папки или первой буквы на
+ * своём цвете. Картинка не загрузилась — видно то, что под ней.
+ */
+function artTile(url, emoji, title, { cls = 'art', fit = false, placeholder = null } = {}) {
+  const letter = [...title].find((ch) => /[\p{L}\p{N}]/u.test(ch))?.toUpperCase() ?? '♪';
+  return h('span.' + cls, { class: fit ? 'fit' : '', style: `background:${ART_COLORS[Math.abs(hash(title)) % ART_COLORS.length]}` },
+    emoji ? h('span.glyph', emoji) : placeholder ? icon(placeholder) : h('span.glyph.letter', letter),
+    url ? h('img', { src: url, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null);
 }
 
 /** Громкость пальцем: команда одна, на отпускании (обработчик — в app.js). */
@@ -75,48 +122,32 @@ function volume(s, live, ctx) {
   }, h('i.fill', { style: `width:${shown}%` }), shown > 2 ? h('i.knob', { style: `left:${shown}%` }) : null, h('span.value', label));
 }
 
-/** Окно радио: папки медиатеки Home Assistant, станция по касанию играет на колонке. */
-function radioSheet(radio, speakers) {
+/**
+ * Окно выбора: папки и станции (или медиатека Music Assistant) плитками с
+ * картинками — как в самом Music Assistant. Станция по касанию сразу играет.
+ */
+function mediaSheet(radio, speakers) {
   const s = speakers.find((x) => x.id === radio.id);
   const folder = radio.folder;
   let body;
   if (radio.loading) body = h('div.empty', 'Загружаем…');
-  else if (!folder) body = h('div.empty', 'Радио недоступно: Home Assistant не ответил');
+  else if (!folder) body = h('div.empty', 'Нет связи с каталогом — попробуйте ещё раз');
   else if (!folder.items.length) body = h('div.empty', 'Здесь пусто');
   else {
-    body = h('div.radio-list', folder.items.map((item) => press('radio-item', {
+    body = h('div.art-grid', folder.items.map((item) => press('art-item', {
       key: 'ri:' + item.contentId, label: item.title,
       act: item.canExpand ? { ui: 'radio-open', contentId: item.contentId, contentType: item.contentType, title: item.title }
-        : item.canPlay ? { ui: 'radio-play', id: radio.id, contentId: item.contentId, contentType: item.contentType } : null,
+        : item.canPlay ? { ui: 'radio-play', id: radio.id, contentId: item.contentId, contentType: item.contentType, title: item.title, thumbnail: item.thumbnail } : null,
       enabled: item.canExpand || item.canPlay,
-    }, icon(item.canExpand ? 'ic_grid' : 'ic_radio'), h('span.t', item.title),
-    item.canExpand ? icon('premium_next', 'next') : h('span.play', 'Играть'))));
+    }, artTile(item.thumbnail, art(item.contentId), item.title, { fit: !item.canExpand }), h('span.t', item.title))));
   }
   return h('div.sheet-back', { 'data-key': 'radio', 'data-act': JSON.stringify({ ui: 'radio-close' }) },
-    h('section.card.sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
+    h('section.card.sheet.wide', { 'data-act': JSON.stringify({ ui: 'none' }) },
       h('div.card-head',
         press('btn-icon', { act: { ui: 'radio-back' }, label: 'Назад' }, icon('premium_back')),
-        // Radio Browser зовёт любую папку «Radio Browser» — заголовок из касания.
         h('div.title', radio.path[radio.path.length - 1][2] ?? 'Радио', h('small', `Играть на: ${s?.name ?? ''}`)),
         actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'radio-close' } })),
       body));
-}
-
-/** Выбор комнат для мультирума: галочки, «Все», «Никого», «Готово». */
-function multiroomSheet(mr, speakers) {
-  const leader = speakers.find((x) => x.id === mr.id);
-  const partners = speakers.filter((o) => o.id !== mr.id && isAvailable(o) && can(o, F.GROUPING));
-  return h('div.sheet-back', { 'data-key': 'multiroom', 'data-act': JSON.stringify({ ui: 'mr-close' }) },
-    h('section.card.sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
-      h('div.card-head', h('div.title', 'Мультирум', h('small', `Играть то же, что на «${leader?.name ?? ''}», ещё в:`))),
-      h('div.tiles', { style: '--per-row:2' }, partners.map((p) => {
-        const on = mr.chosen.has(p.id);
-        return actionButton([p.name, p.room].filter(Boolean).join(' · '), { iconName: on ? 'ic_speaker' : null, on, key: 'mr:' + p.id, act: { ui: 'mr-toggle', member: p.id } });
-      })),
-      h('div.row2',
-        actionButton('Все', { act: { ui: 'mr-all', members: partners.map((p) => p.id) } }),
-        actionButton('Никого', { act: { ui: 'mr-none' } }),
-        actionButton('Готово', { iconName: 'ic_speaker', on: true, act: { ui: 'mr-done' } }))));
 }
 
 /** «Найти музыку»: поле, «Найти», находки по разделам; касание играет на колонке. */
@@ -133,7 +164,7 @@ function searchSheet(find, speakers) {
       ...sec.hits.map((hit) => press('radio-item', {
         key: 'fh:' + hit.uri, label: hit.title,
         act: { ui: 'find-play', id: find.id, uri: hit.uri, mediaType: hit.mediaType },
-      }, icon('ic_music'), h('span.t', hit.title, hit.subtitle ? h('small', ' · ' + hit.subtitle) : null), h('span.play', 'Играть'))),
+      }, artTile(hit.image, null, hit.title, { cls: 'thumb', placeholder: 'ic_music' }), h('span.t', hit.title, hit.subtitle ? h('small', ' · ' + hit.subtitle) : null), h('span.play', 'Играть'))),
     ]));
   }
   return h('div.sheet-back', { 'data-key': 'find', 'data-act': JSON.stringify({ ui: 'find-close' }) },

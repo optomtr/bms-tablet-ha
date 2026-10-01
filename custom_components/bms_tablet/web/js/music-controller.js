@@ -1,11 +1,36 @@
-// Музыка: команды колонкам, окно радио, мультирум, громкость пальцем, реестры.
+// Музыка: команды колонкам, радио плитками, мультирум одним касанием, громкость пальцем, реестры.
 // Отдельно от app.js — тот же порядок, что у раздела «Музыка» Android-планшета.
 
-import { musicCall, parseMediaFolder, radioRoot, RADIO_ROOT, multiroomActions, parseAssistantSearch } from './model/music.js';
+import { musicCall, parseMediaFolder, parseAssistantSearch, groupLeader } from './model/music.js';
+import { browse as browseCatalog, PREFIX } from './model/radio.js';
 
 let deps = null; // {conn: () => connection, ui, render, findSpeaker}
 
-export function setupMusic(d) { deps = d; }
+const STATIONS = 'bms-music-stations';
+
+export function setupMusic(d) {
+  deps = d;
+  d.ui.mrPending = {};
+  // Станции, включённые с этого iPad: колонка называет радио адресом, а мы — именем.
+  try { d.ui.stations = JSON.parse(localStorage.getItem(STATIONS) ?? '{}') ?? {}; } catch { d.ui.stations = {}; }
+}
+
+function rememberStation(id, title, thumbnail) {
+  deps.ui.stations[id] = { title, thumbnail: thumbnail ?? null };
+  try { localStorage.setItem(STATIONS, JSON.stringify(deps.ui.stations)); } catch { /* без памяти */ }
+}
+
+/** Мультирум: команда одна, кнопка ждёт перехода не дольше 15 с. */
+function groupCommand(id, target, action) {
+  const { ui, render, findSpeaker, allSpeakers } = deps;
+  const s = findSpeaker(id);
+  if (!s || ui.mrPending[id]) return;
+  const pending = { target, leaderBefore: groupLeader(s, allSpeakers())?.id ?? null };
+  ui.mrPending[id] = pending;
+  render();
+  sendMusic(action);
+  setTimeout(() => { if (ui.mrPending[id] === pending) { delete ui.mrPending[id]; render(); } }, 15000);
+}
 
 export async function sendMusic(action) {
   try {
@@ -17,8 +42,8 @@ export async function sendMusic(action) {
 export function musicUiCommand(act) {
   const { ui, render } = deps;
   switch (act.ui) {
-    case 'radio': openRadio(act.id); return true;
-    case 'library': openRadio(act.id, [null, null, 'Медиатека']); return true;
+    case 'radio': openRadio(act.id, 'radio', [PREFIX + 'root', 'folder', 'Радио']); return true;
+    case 'library': openRadio(act.id, 'library', [null, null, 'Медиатека']); return true;
     case 'find-open': ui.find = { id: act.id, query: '', result: null, loading: false }; render(); return true;
     case 'find-close': ui.find = null; render(); return true;
     case 'find-run': runSearch(); return true;
@@ -26,33 +51,19 @@ export function musicUiCommand(act) {
     case 'radio-open': browseRadio([...ui.radio.path, [act.contentId, act.contentType, act.title]]); return true;
     case 'radio-back': if (ui.radio.path.length > 1) browseRadio(ui.radio.path.slice(0, -1)); else closeRadio(); return true;
     case 'radio-close': closeRadio(); return true;
-    case 'radio-play': closeRadio(); sendMusic({ type: 'Play', id: act.id, contentId: act.contentId, contentType: act.contentType }); return true;
-    case 'mr-open': {
-      const s = deps.findSpeaker(act.id);
-      ui.multiroom = { id: act.id, chosen: new Set((s?.group ?? []).filter((g) => g !== act.id)) };
-      render(); return true;
-    }
-    case 'mr-toggle': {
-      const c = ui.multiroom.chosen;
-      if (c.has(act.member)) c.delete(act.member); else c.add(act.member);
-      render(); return true;
-    }
-    case 'mr-all': ui.multiroom.chosen = new Set(act.members); render(); return true;
-    case 'mr-none': ui.multiroom.chosen = new Set(); render(); return true;
-    case 'mr-close': ui.multiroom = null; render(); return true;
-    case 'mr-done': {
-      const s = deps.findSpeaker(ui.multiroom.id);
-      const chosen = ui.multiroom.chosen;
-      ui.multiroom = null; render();
-      if (s) multiroomActions(s, chosen).forEach(sendMusic);
+    case 'radio-play':
+      if (ui.radio?.kind === 'radio') rememberStation(act.id, act.title, act.thumbnail);
+      closeRadio();
+      sendMusic({ type: 'Play', id: act.id, contentId: act.contentId, contentType: act.contentType });
       return true;
-    }
+    case 'mr-join': groupCommand(act.id, act.target, { type: 'Join', id: act.target, members: [act.id] }); return true;
+    case 'mr-leave': groupCommand(act.id, act.leader, { type: 'Unjoin', id: act.id }); return true;
     default: return false;
   }
 }
 
-function openRadio(id, root = [RADIO_ROOT, 'music', 'Радио']) {
-  deps.ui.radio = { id, path: [root], folder: null, loading: true };
+function openRadio(id, kind, root) {
+  deps.ui.radio = { id, kind, path: [root], folder: null, loading: true };
   browseRadio(deps.ui.radio.path);
 }
 
@@ -67,13 +78,15 @@ async function browseRadio(path) {
   radio.path = path;
   radio.loading = true;
   deps.render();
-  const [contentId, contentType] = path[path.length - 1];
+  const [contentId, contentType, title] = path[path.length - 1];
   let folder = null;
   try {
-    const msg = { type: 'media_player/browse_media', entity_id: radio.id };
-    if (contentId) Object.assign(msg, { media_content_id: contentId, media_content_type: contentType ?? '' });
-    folder = parseMediaFolder(await deps.conn().sendMessage(msg));
-    if (folder && contentId === RADIO_ROOT) folder = radioRoot(folder);
+    if (radio.kind === 'radio') folder = await browseCatalog(contentId, title);
+    else {
+      const msg = { type: 'media_player/browse_media', entity_id: radio.id };
+      if (contentId) Object.assign(msg, { media_content_id: contentId, media_content_type: contentType ?? '' });
+      folder = parseMediaFolder(await deps.conn().sendMessage(msg));
+    }
   } catch { folder = null; }
   if (deps.ui.radio !== radio || radio.path !== path) return; // уже ушли в другую папку
   radio.folder = folder;

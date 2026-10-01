@@ -231,7 +231,8 @@ def with_base_tag(html: str, base: str | None = None) -> str:
 
 
 def content_security_policy(host: str | None) -> str:
-    connect = ["'self'"]
+    # Каталог радио (Radio Browser) — напрямую: через Home Assistant жанр грузится 20 с.
+    connect = ["'self'", "https://*.api.radio-browser.info"]
     # Старый Safari не считает ws(s) на свой адрес частью 'self' — пишем явно.
     if host and _SAFE_HOST.fullmatch(host):
         connect += [f"wss://{host}", f"ws://{host}"]
@@ -241,7 +242,8 @@ def content_security_policy(host: str | None) -> str:
             "script-src 'self'",
             # style="--cols:3" в разметке — атрибуты стилей нужны.
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob:",
+            # Обложки и значки радиостанций — с их сайтов, только https.
+            "img-src 'self' data: blob: https:",
             "font-src 'self'",
             "media-src 'self' blob:",
             "connect-src " + " ".join(connect),

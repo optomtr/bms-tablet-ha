@@ -84,11 +84,16 @@ export const canPlayPause = (s) => can(s, F.PAUSE) || can(s, F.PLAY);
 export const canSource = (s) => can(s, F.SELECT_SOURCE) && s.sources.length > 1;
 export const canBrowse = (s) => can(s, F.BROWSE_MEDIA) && can(s, F.PLAY_MEDIA);
 
+/** Название трека для людей: радио по адресу LinkPlay называет самим адресом — такое не показываем. */
+export const trackTitle = (s) => (s.title && !s.title.includes('://') ? s.title.trim() : null);
+/** Исполнитель; «Unknown» от колонки — это «не знаю», не имя. */
+export const trackArtist = (s) => (s.artist && s.artist.trim().toLowerCase() !== 'unknown' ? s.artist.trim() : null);
+
 /** Что написать под названием колонки. */
 export function nowPlaying(s) {
   if (!isAvailable(s)) return 'Недоступна';
-  if (s.title) return [s.title, s.artist].filter(Boolean).join(' · ');
-  if (isPlaying(s)) return s.source ? `Играет · ${s.source}` : 'Играет';
+  if (trackTitle(s)) return [trackTitle(s), trackArtist(s)].filter(Boolean).join(' · ');
+  if (isPlaying(s)) return s.title ? 'Интернет-радио' : 'Играет';
   if (s.state === 'paused') return 'Пауза';
   if (s.state === 'off') return 'Выключена';
   return 'Ничего не играет';
@@ -118,40 +123,30 @@ export function parseMediaFolder(result) {
   const items = (result.children ?? []).filter((c) => c?.media_content_id).map((c) => ({
     title: c.title || c.media_content_id, contentId: c.media_content_id,
     contentType: c.media_content_type || 'music', canPlay: c.can_play === true, canExpand: c.can_expand === true,
+    thumbnail: typeof c.thumbnail === 'string' && c.thumbnail ? c.thumbnail : null,
   }));
   return { title: result.title || 'Медиатека', items };
 }
 
-export const RADIO_ROOT = 'media-source://radio_browser';
-
-/** Корень радио по-нашему: сначала Узбекистан и Россия, разделы — по-русски. */
-export function radioRoot(folder) {
-  const first = [['/country/UZ', 'Узбекистан'], ['/country/RU', 'Россия'], ['/popular', 'Популярное в мире'],
-    ['/language', 'По языку'], ['/tag', 'По жанру'], ['/category', 'По жанру'], ['/local', 'Рядом']];
-  const rank = (item) => { const i = first.findIndex(([tail]) => item.contentId.endsWith(tail)); return i < 0 ? Infinity : i; };
-  const items = [...folder.items].sort((a, b) => (rank(a) === rank(b) ? 0 : rank(a) < rank(b) ? -1 : 1))
-    .map((item) => { const hit = first.find(([tail]) => item.contentId.endsWith(tail)); return hit ? { ...item, title: hit[1] } : item; });
-  return { title: 'Радио', items };
+/** Ведущая группы, где играет колонка (первая в group_members); null — играет одна. */
+export function groupLeader(speaker, all) {
+  const group = speaker.group.length > 1 ? speaker.group
+    : all.find((o) => o.id !== speaker.id && o.group.length > 1 && o.group.includes(speaker.id))?.group;
+  return group ? all.find((o) => o.id === group[0]) ?? null : null;
 }
 
-/** Мультирум: команды, чтобы с leader играли ровно chosen (без самой колонки). */
-export function multiroomActions(leader, chosen) {
-  const current = new Set(leader.group.filter((g) => g !== leader.id));
-  const wanted = [...chosen].filter((c) => c !== leader.id);
-  const out = [];
-  if (wanted.length && wanted.some((w) => !current.has(w))) out.push({ type: 'Join', id: leader.id, members: wanted });
-  for (const c of current) if (!wanted.includes(c)) out.push({ type: 'Unjoin', id: c });
-  return out;
-}
+/** Кто играет вместе с ведущей (без неё самой). */
+export const groupFollowers = (leader, all) => all.filter((o) => o.id !== leader.id && leader.group.includes(o.id));
 
-/** С кем колонка играет вместе (имена); ведомая узнаёт это по группе ведущей. */
-export function groupPartners(speaker, all) {
-  let ids = speaker.group.filter((g) => g !== speaker.id);
-  if (!ids.length) {
-    const leader = all.find((o) => o.id !== speaker.id && o.group.length > 1 && o.group.includes(speaker.id));
-    ids = leader ? leader.group.filter((g) => g !== speaker.id) : [];
-  }
-  return all.filter((o) => ids.includes(o.id)).map((o) => o.name);
+/**
+ * К кому одиночную колонку можно подключить одним касанием: где играет музыка —
+ * одиночки и ведущие. По одной колонке: каждый join у LinkPlay заново
+ * синхронизирует группу, и звук на миг пропадает во всех комнатах.
+ */
+export function joinTargets(speaker, all) {
+  if (!can(speaker, F.GROUPING) || groupLeader(speaker, all)) return [];
+  return all.filter((o) => o.id !== speaker.id && isAvailable(o) && can(o, F.GROUPING) && isPlaying(o)
+    && (groupLeader(o, all)?.id ?? o.id) === o.id);
 }
 
 const SEARCH_SECTIONS = [['tracks', 'Песни'], ['albums', 'Альбомы'], ['playlists', 'Плейлисты'], ['artists', 'Исполнители'], ['radio', 'Радио']];
@@ -166,6 +161,7 @@ export function parseAssistantSearch(response) {
       subtitle: (o.artists ?? []).map((a) => a?.name).filter(Boolean).join(', ') || null,
       uri: o.uri,
       mediaType: o.media_type || key.replace(/s$/, ''),
+      image: typeof o.image === 'string' && o.image ? o.image : null,
     })),
   }));
 }

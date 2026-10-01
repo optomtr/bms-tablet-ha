@@ -258,8 +258,6 @@ root.addEventListener('change', (event) => {
     ui.rememberedMode[act.id] = value;
     if (act.on) dispatch({ type: 'ClimateMode', id: act.id, mode: value });
     else render();
-  } else if (act.music === 'Source') {
-    sendMusic({ type: 'Source', id: act.id, source: value });
   } else if (act.type === 'ClimateFanMode') {
     dispatch({ type: 'ClimateFanMode', id: act.id, mode: value });
   }
@@ -388,7 +386,7 @@ async function start() {
     return auth.accessToken;
   }, () => render());
   conn = createConnection(auth);
-  setupMusic({ conn: () => conn, ui, render, findSpeaker: (id) => speakers.find((s) => s.id === id) });
+  setupMusic({ conn: () => conn, ui, render, findSpeaker: (id) => speakers.find((s) => s.id === id), allSpeakers: () => speakers });
   conn.onStatus((next, detail) => {
     status = next;
     if (next === 'connected') { everConnected = true; offlineSince = null; }
