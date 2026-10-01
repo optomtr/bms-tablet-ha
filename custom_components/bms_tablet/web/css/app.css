@@ -203,6 +203,28 @@ svg { display: block; width: 100%; height: 100%; }
 .slider.on .value { color: var(--ink); }
 .slider.disabled { opacity: .46; pointer-events: none; }
 
+/* Музыка: карточка колонки и окно радио */
+.now { display: flex; align-items: center; gap: 12px; }
+.now .cover { width: 64px; height: 64px; flex: none; border-radius: var(--tile-r); background: #2E2E2C; overflow: hidden; display: grid; place-items: center; }
+.now .cover img { width: 100%; height: 100%; object-fit: cover; }
+.now .cover .ic { width: 28px; height: 28px; color: var(--muted); }
+.now .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.now .what { font-size: 16px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.now .what.on { color: var(--ink); }
+.now .room { font-size: 12px; color: var(--muted); }
+.row2 { display: flex; gap: var(--gap); }
+.row2 > * { flex: 1; min-width: 0; }
+.action.select { position: relative; }
+.action.select select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.sheet-back { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .55); display: grid; place-items: center; padding: 24px; }
+.sheet { width: min(720px, 100%); max-height: 85vh; overflow: hidden; }
+.sheet .card-head .title small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.radio-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; -webkit-overflow-scrolling: touch; }
+.radio-item { min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.radio-item .ic { width: 22px; height: 22px; }
+.radio-item .t { flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-item .play { font-size: 13px; color: var(--gold); }
+
 /* Отопление: строка «комната · Вкл. · Выкл.» */
 .heat-row { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(59, 59, 56, .5); }
 .heat-row .who { flex: 1; min-width: 0; font-size: 15px; }
