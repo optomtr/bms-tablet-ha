@@ -4,6 +4,7 @@
 
 import { h, icon } from './dom.js';
 import { press } from './components.js';
+import { climateOnlySummary } from '../model/summary.js';
 
 const cache = new Map(); // ключ → {url|null, loading}
 let tokenSource = null;
@@ -50,11 +51,13 @@ function framing(bg) {
 
 export function roomCard(room, nav, title, ctx) {
   const url = photoUrl(room.background);
+  const climate = url ? null : climateOnlySummary(room);
   return press('room-card', { nav, card: true, label: title, key: 'rc:' + nav },
     url ? h('img', { src: url, alt: '', style: framing(room.background), draggable: 'false' }) : null,
     h('i.shade'),
-    url ? null : icon('premium_home', 'placeholder'),
-    h('span.foot', h('span.t', title), icon('premium_next', 'next')));
+    // Комната из одних кондиционеров — «по-климатовски»: значок и сводка.
+    url ? null : (climate ? icon('ic_fan', 'placeholder climate') : icon('premium_home', 'placeholder')),
+    h('span.foot', h('span.t', title, climate ? h('small', climate) : null), icon('premium_next', 'next')));
 }
 
 /** Размытый фон страницы (ConfiguredBackdrop). */

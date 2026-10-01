@@ -114,6 +114,8 @@ svg { display: block; width: 100%; height: 100%; }
 .room-card .foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; padding: var(--card-pad); }
 .room-card .foot .t { flex: 1; min-width: 0; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .room-card .foot .next { color: rgba(244, 243, 237, .8); }
+.room-card .placeholder.climate { width: 52px; height: 52px; margin-top: -24px; color: var(--gold); }
+.room-card .foot .t small { display: block; font-size: 13px; color: var(--muted); }
 
 /* Карточка (Group / CardSurface) */
 .card { display: flex; flex-direction: column; gap: var(--gap); padding: var(--card-pad); border-radius: var(--card-r);

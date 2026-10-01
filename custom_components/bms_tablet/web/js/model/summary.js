@@ -218,3 +218,14 @@ export function pageModel(rooms, selected) {
   };
   return m;
 }
+
+/** Комната из одних климатических приборов («Климат» дачи): «8 кондиционеров · включено 1»; иначе null. */
+export function climateOnlySummary(room) {
+  if (!room.climates.length || room.lights.length || room.covers.length || room.toggles.length) return null;
+  const n = room.climates.length;
+  const on = room.climates.filter((c) => c.mode !== 'off').length;
+  const what = room.climates.every((c) => c.kind === 'AC')
+    ? plural(n, 'кондиционер', 'кондиционера', 'кондиционеров')
+    : plural(n, 'термостат', 'термостата', 'термостатов');
+  return `${n} ${what} · ` + (on === 0 ? 'все выключены' : `включено ${on}`);
+}
