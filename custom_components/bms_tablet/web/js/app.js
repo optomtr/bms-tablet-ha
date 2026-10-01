@@ -237,7 +237,7 @@ function uiCommand(act) {
     case 'logout': return logout({ base: location.origin }).finally(() => location.reload());
     case 'target': return stepClimate(act.id, act.up);
     case 'radio': return openRadio(act.id);
-    case 'radio-open': return browseRadio([...ui.radio.path, [act.contentId, act.contentType]]);
+    case 'radio-open': return browseRadio([...ui.radio.path, [act.contentId, act.contentType, act.title]]);
     case 'radio-back': return ui.radio.path.length > 1 ? browseRadio(ui.radio.path.slice(0, -1)) : closeRadio();
     case 'radio-close': return closeRadio();
     case 'radio-play': closeRadio(); return sendMusic({ type: 'Play', id: act.id, contentId: act.contentId, contentType: act.contentType });
@@ -348,7 +348,7 @@ async function sendMusic(action) {
 }
 
 function openRadio(id) {
-  ui.radio = { id, path: [[RADIO_ROOT, 'music']], folder: null, loading: true };
+  ui.radio = { id, path: [[RADIO_ROOT, 'music', 'Радио']], folder: null, loading: true };
   browseRadio(ui.radio.path);
 }
 

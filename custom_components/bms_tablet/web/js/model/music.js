@@ -109,7 +109,7 @@ export const RADIO_ROOT = 'media-source://radio_browser';
 /** Корень радио по-нашему: сначала Узбекистан и Россия, разделы — по-русски. */
 export function radioRoot(folder) {
   const first = [['/country/UZ', 'Узбекистан'], ['/country/RU', 'Россия'], ['/popular', 'Популярное в мире'],
-    ['/language', 'По языку'], ['/category', 'По жанру'], ['/local', 'Рядом']];
+    ['/language', 'По языку'], ['/tag', 'По жанру'], ['/category', 'По жанру'], ['/local', 'Рядом']];
   const rank = (item) => { const i = first.findIndex(([tail]) => item.contentId.endsWith(tail)); return i < 0 ? Infinity : i; };
   const items = [...folder.items].sort((a, b) => (rank(a) === rank(b) ? 0 : rank(a) < rank(b) ? -1 : 1))
     .map((item) => { const hit = first.find(([tail]) => item.contentId.endsWith(tail)); return hit ? { ...item, title: hit[1] } : item; });

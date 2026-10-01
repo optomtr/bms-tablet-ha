@@ -76,7 +76,7 @@ function radioSheet(radio, speakers) {
   else {
     body = h('div.radio-list', folder.items.map((item) => press('radio-item', {
       key: 'ri:' + item.contentId, label: item.title,
-      act: item.canExpand ? { ui: 'radio-open', contentId: item.contentId, contentType: item.contentType }
+      act: item.canExpand ? { ui: 'radio-open', contentId: item.contentId, contentType: item.contentType, title: item.title }
         : item.canPlay ? { ui: 'radio-play', id: radio.id, contentId: item.contentId, contentType: item.contentType } : null,
       enabled: item.canExpand || item.canPlay,
     }, icon(item.canExpand ? 'ic_grid' : 'ic_radio'), h('span.t', item.title),
@@ -86,7 +86,8 @@ function radioSheet(radio, speakers) {
     h('section.card.sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
       h('div.card-head',
         press('btn-icon', { act: { ui: 'radio-back' }, label: 'Назад' }, icon('premium_back')),
-        h('div.title', folder?.title ?? 'Радио', h('small', `Играть на: ${s?.name ?? ''}`)),
+        // Radio Browser зовёт любую папку «Radio Browser» — заголовок из касания.
+        h('div.title', radio.path[radio.path.length - 1][2] ?? 'Радио', h('small', `Играть на: ${s?.name ?? ''}`)),
         actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'radio-close' } })),
       body));
 }

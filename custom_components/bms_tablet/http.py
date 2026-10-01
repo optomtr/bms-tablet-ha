@@ -206,9 +206,6 @@ def _integration_version() -> str:
     return version if re.fullmatch(r"[0-9][0-9A-Za-z.\-]{0,30}", str(version)) else ""
 
 
-WEB_VERSION = _integration_version()
-
-
 def web_base_href() -> str:
     """Адрес файлов страницы, своя папка на каждую версию: /bms_tablet_web/v0.7.6/.
 
@@ -216,14 +213,17 @@ def web_base_href() -> str:
     их из своего кэша, не спросив сервер. Новый адрес у каждой версии такой
     кэш обходит наверняка; WebStaticView этот сегмент просто отбрасывает.
     """
-    return f"{WEB_STATIC_PATH}/v{WEB_VERSION}/" if WEB_VERSION else WEB_BASE_HREF
+    # Версию читаем при каждом открытии страницы: обновление одних файлов
+    # страницы через HACS доходит без перезапуска HA.
+    version = _integration_version()
+    return f"{WEB_STATIC_PATH}/v{version}/" if version else WEB_BASE_HREF
 
 
-def with_base_tag(html: str) -> str:
+def with_base_tag(html: str, base: str | None = None) -> str:
     """Добавить <base href="/bms_tablet_web/v<версия>/">, если в файле его нет."""
     if _BASE_TAG.search(html):
         return html
-    tag = f'<base href="{web_base_href()}">'
+    tag = f'<base href="{base or web_base_href()}">'
     head = _HEAD_TAG.search(html)
     if head:
         return html[: head.end()] + tag + html[head.end():]
@@ -273,11 +273,11 @@ class WebPageView(HomeAssistantView):
         self._hass = hass
 
     async def get(self, request: web.Request) -> web.Response:
-        html = await self._hass.async_add_executor_job(read_page)
+        html, base = await self._hass.async_add_executor_job(lambda: (read_page(), web_base_href()))
         if html is None:
             return web.Response(status=503, text="Веб-версия не установлена", headers={"Cache-Control": "no-store"})
         return web.Response(
-            text=with_base_tag(html),
+            text=with_base_tag(html, base),
             content_type="text/html",
             charset="utf-8",
             headers={
