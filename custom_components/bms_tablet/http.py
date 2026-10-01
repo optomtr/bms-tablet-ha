@@ -188,6 +188,7 @@ class BackgroundImageView(HomeAssistantView):
 # себя) и только после строгой проверки.
 
 WEB_BASE_HREF = WEB_STATIC_PATH + "/"
+_VERSION_SEGMENT = re.compile(r"^v[0-9][0-9A-Za-z.\-]{0,30}/")
 _BASE_TAG = re.compile(r"<base[\s>/]", re.IGNORECASE)
 _HEAD_TAG = re.compile(r"<head(\s[^>]*)?>", re.IGNORECASE)
 _SAFE_HOST = re.compile(r"(?:[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]{2,45}\])(?::\d{1,5})?")
@@ -197,11 +198,32 @@ def web_dir() -> Path:
     return Path(__file__).parent / WEB_DIR
 
 
+def _integration_version() -> str:
+    try:
+        version = json.loads((Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")).get("version", "")
+    except (OSError, ValueError):
+        return ""
+    return version if re.fullmatch(r"[0-9][0-9A-Za-z.\-]{0,30}", str(version)) else ""
+
+
+WEB_VERSION = _integration_version()
+
+
+def web_base_href() -> str:
+    """Адрес файлов страницы, своя папка на каждую версию: /bms_tablet_web/v0.7.6/.
+
+    На даче после обновления браузер собрал страницу из старых модулей — взял
+    их из своего кэша, не спросив сервер. Новый адрес у каждой версии такой
+    кэш обходит наверняка; WebStaticView этот сегмент просто отбрасывает.
+    """
+    return f"{WEB_STATIC_PATH}/v{WEB_VERSION}/" if WEB_VERSION else WEB_BASE_HREF
+
+
 def with_base_tag(html: str) -> str:
-    """Добавить <base href="/bms_tablet_web/">, если в файле его нет."""
+    """Добавить <base href="/bms_tablet_web/v<версия>/">, если в файле его нет."""
     if _BASE_TAG.search(html):
         return html
-    tag = f'<base href="{WEB_BASE_HREF}">'
+    tag = f'<base href="{web_base_href()}">'
     head = _HEAD_TAG.search(html)
     if head:
         return html[: head.end()] + tag + html[head.end():]
@@ -274,6 +296,8 @@ WEB_FILE_TYPES = {".html", ".js", ".css", ".png", ".svg", ".ttf", ".woff2", ".js
 def web_file(path: str) -> Path | None:
     """Файл веб-версии по пути из адреса или None: «..», ссылки наружу и чужие типы — нет."""
     root = web_dir().resolve()
+    # Сегмент версии из <base> («v0.7.6/js/app.js») — не папка, отбрасываем.
+    path = _VERSION_SEGMENT.sub("", path, count=1)
     try:
         target = (root / path).resolve()
     except (OSError, ValueError):
