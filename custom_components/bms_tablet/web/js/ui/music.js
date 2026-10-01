@@ -3,7 +3,7 @@
 
 import { h, icon } from './dom.js';
 import { press, group, actionButton, emptySection } from './components.js';
-import { F, can, canPlayPause, canSource, canBrowse, isAvailable, isPlaying, nowPlaying } from '../model/music.js';
+import { F, can, canPlayPause, canSource, canBrowse, isAvailable, isPlaying, nowPlaying, groupPartners } from '../model/music.js';
 
 export const MUSIC = 'Музыка';
 
@@ -12,6 +12,7 @@ export function musicPage(speakers, g, ctx) {
   const cards = speakers.map((s) => speakerCard(s, speakers, ctx));
   const out = [h('div.grid', { style: `--cols:${g.columns}`, 'data-key': 'speakers' }, cards)];
   if (ctx.ui.radio) out.push(radioSheet(ctx.ui.radio, speakers));
+  if (ctx.ui.multiroom) out.push(multiroomSheet(ctx.ui.multiroom, speakers));
   return out;
 }
 
@@ -46,10 +47,12 @@ function speakerCard(s, all, ctx) {
         h('select', { 'aria-label': 'Вход · ' + s.name, disabled: !live, 'data-choice': JSON.stringify({ music: 'Source', id: s.id }), 'data-value': s.source ?? '' },
           (s.source ? [] : [h('option', { value: '', selected: true }, 'Вход')]).concat(s.sources.map((src) => h('option', { value: src, selected: src === s.source }, src))))) : null));
   }
+  // Мультирум: с кем играет вместе и выбор комнат.
   const partners = all.filter((o) => o.id !== s.id && isAvailable(o) && can(o, F.GROUPING));
   if (can(s, F.GROUPING) && partners.length) {
-    if (s.group.length > 1) parts.push(actionButton(`Вместе: ${s.group.length} · отключить`, { iconName: 'ic_speaker', on: true, enabled: live, act: act('Unjoin', s.id) }));
-    else if (playing) parts.push(actionButton('Играть везде', { iconName: 'ic_speaker', enabled: live, act: act('Join', s.id, { members: partners.map((p) => p.id) }) }));
+    const together = groupPartners(s, all);
+    if (together.length) parts.push(h('div.together', `Играет вместе с: ${together.join(', ')}`));
+    parts.push(actionButton('Мультирум', { iconName: 'ic_speaker', on: together.length > 0, enabled: live, act: { ui: 'mr-open', id: s.id } }));
   }
   return group(s.name, { action, key: 'speaker:' + s.id }, ...parts);
 }
@@ -90,4 +93,21 @@ function radioSheet(radio, speakers) {
         h('div.title', radio.path[radio.path.length - 1][2] ?? 'Радио', h('small', `Играть на: ${s?.name ?? ''}`)),
         actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'radio-close' } })),
       body));
+}
+
+/** Выбор комнат для мультирума: галочки, «Все», «Никого», «Готово». */
+function multiroomSheet(mr, speakers) {
+  const leader = speakers.find((x) => x.id === mr.id);
+  const partners = speakers.filter((o) => o.id !== mr.id && isAvailable(o) && can(o, F.GROUPING));
+  return h('div.sheet-back', { 'data-key': 'multiroom', 'data-act': JSON.stringify({ ui: 'mr-close' }) },
+    h('section.card.sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
+      h('div.card-head', h('div.title', 'Мультирум', h('small', `Играть то же, что на «${leader?.name ?? ''}», ещё в:`))),
+      h('div.tiles', { style: '--per-row:2' }, partners.map((p) => {
+        const on = mr.chosen.has(p.id);
+        return actionButton([p.name, p.room].filter(Boolean).join(' · '), { iconName: on ? 'ic_speaker' : null, on, key: 'mr:' + p.id, act: { ui: 'mr-toggle', member: p.id } });
+      })),
+      h('div.row2',
+        actionButton('Все', { act: { ui: 'mr-all', members: partners.map((p) => p.id) } }),
+        actionButton('Никого', { act: { ui: 'mr-none' } }),
+        actionButton('Готово', { iconName: 'ic_speaker', on: true, act: { ui: 'mr-done' } }))));
 }

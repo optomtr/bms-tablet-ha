@@ -115,3 +115,23 @@ export function radioRoot(folder) {
     .map((item) => { const hit = first.find(([tail]) => item.contentId.endsWith(tail)); return hit ? { ...item, title: hit[1] } : item; });
   return { title: 'Радио', items };
 }
+
+/** Мультирум: команды, чтобы с leader играли ровно chosen (без самой колонки). */
+export function multiroomActions(leader, chosen) {
+  const current = new Set(leader.group.filter((g) => g !== leader.id));
+  const wanted = [...chosen].filter((c) => c !== leader.id);
+  const out = [];
+  if (wanted.length && wanted.some((w) => !current.has(w))) out.push({ type: 'Join', id: leader.id, members: wanted });
+  for (const c of current) if (!wanted.includes(c)) out.push({ type: 'Unjoin', id: c });
+  return out;
+}
+
+/** С кем колонка играет вместе (имена); ведомая узнаёт это по группе ведущей. */
+export function groupPartners(speaker, all) {
+  let ids = speaker.group.filter((g) => g !== speaker.id);
+  if (!ids.length) {
+    const leader = all.find((o) => o.id !== speaker.id && o.group.length > 1 && o.group.includes(speaker.id));
+    ids = leader ? leader.group.filter((g) => g !== speaker.id) : [];
+  }
+  return all.filter((o) => ids.includes(o.id)).map((o) => o.name);
+}

@@ -213,6 +213,7 @@ svg { display: block; width: 100%; height: 100%; }
 .now .what.on { color: var(--ink); }
 .now .room { font-size: 12px; color: var(--muted); }
 .row2 { display: flex; gap: var(--gap); }
+.together { font-size: 13px; color: var(--gold); }
 .row2 > * { flex: 1; min-width: 0; }
 .action.select { position: relative; }
 .action.select select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; -webkit-appearance: none; appearance: none; cursor: pointer; }
