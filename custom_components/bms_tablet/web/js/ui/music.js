@@ -111,7 +111,7 @@ function artTile(url, emoji, title, { cls = 'art', fit = false, placeholder = nu
     url ? h('img', { src: url, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null);
 }
 
-/** Громкость пальцем: команда одна, на отпускании (обработчик — в app.js). */
+/** Громкость пальцем: меняется сразу, пока палец едет (обработчик — music-controller.js). */
 function volume(s, live, ctx) {
   const shown = ctx.ui.drag['vol:' + s.id] ?? s.volume;
   const label = s.muted ? 'Без звука' : `Громкость ${shown} %`;

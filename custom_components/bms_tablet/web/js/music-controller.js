@@ -121,23 +121,56 @@ async function runSearch() {
   deps.render();
 }
 
-/** Громкость: как ползунок вытяжки, но без ступеней; одна команда на отпускании. */
+/**
+ * Громкость вживую — порт LiveVolume Android-планшета: пока палец едет, колонка
+ * слышит новое значение сразу, потом не чаще раза в intervalMs; на отпускании —
+ * последнее, если его ещё не слали.
+ */
+export function liveVolume(intervalMs = 200) {
+  let sentAt = -Infinity;
+  let sent = null;
+  return {
+    move(value, now) {
+      if (value === sent || now - sentAt < intervalMs) return null;
+      sentAt = now; sent = value;
+      return value;
+    },
+    finish(value) {
+      const out = value === sent ? null : value;
+      sent = null; sentAt = -Infinity;
+      return out;
+    },
+  };
+}
+
+/** Громкость пальцем: меняется сразу, пока палец на полосе; хвост — на отпускании. */
 export function startVolume(el, event) {
   const { ui, render } = deps;
   const id = el.dataset.volume;
   if (el.classList.contains('disabled')) return;
   try { el.setPointerCapture(event.pointerId); } catch { /* без захвата */ }
   const key = 'vol:' + id;
+  const throttle = liveVolume();
+  let timer = null;
   const valueAt = (x) => { const r = el.getBoundingClientRect(); return Math.max(0, Math.min(100, Math.round(((x - r.left) / r.width) * 100))); };
+  const push = () => {
+    const v = throttle.move(ui.drag[key], performance.now());
+    if (v != null) sendMusic({ type: 'Volume', id, percent: v });
+    // Рано — дошлём, когда пройдёт интервал, даже если палец замер.
+    else if (!timer) timer = setTimeout(() => { timer = null; push(); }, 200);
+  };
   ui.drag[key] = valueAt(event.clientX);
   render();
-  const move = (e) => { ui.drag[key] = valueAt(e.clientX); render(); };
-  const end = (e) => {
+  push();
+  const move = (e) => { ui.drag[key] = valueAt(e.clientX); render(); push(); };
+  const end = () => {
     el.removeEventListener('pointermove', move);
     el.removeEventListener('pointerup', end);
     el.removeEventListener('pointercancel', end);
-    if (e.type !== 'pointercancel') sendMusic({ type: 'Volume', id, percent: ui.drag[key] });
-    setTimeout(() => { delete ui.drag[key]; render(); }, e.type === 'pointercancel' ? 0 : 2500);
+    clearTimeout(timer);
+    const last = throttle.finish(ui.drag[key]);
+    if (last != null) sendMusic({ type: 'Volume', id, percent: last });
+    setTimeout(() => { delete ui.drag[key]; render(); }, 2500);
   };
   el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', end);
