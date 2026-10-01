@@ -21,6 +21,16 @@ PANEL_ICON = "mdi:tablet-dashboard"
 PANEL_COMPONENT = "bms-tablet-editor"
 PANEL_STATIC_PATH = "/bms_tablet_static"
 
+# Веб-версия планшета для iPad (Safari, «На экран Домой»). Адрес страницы
+# нарочно не /bms-tablet: это уже адрес боковой панели редактора, и
+# перезагрузка редактора открыла бы планшет вместо него.
+WEB_URL_PATH = "/bms-home"
+WEB_MANIFEST_PATH = WEB_URL_PATH + "/manifest.webmanifest"
+WEB_STATIC_PATH = "/bms_tablet_web"
+WEB_DIR = "web"
+WEB_TITLE = "BMS Дом"
+WEB_THEME_COLOR = "#171A17"
+
 # Фото комнат раздаём своим статическим путём, а не через /local:
 # /local регистрируется только если папка www существовала на старте HA.
 BACKGROUND_URL_PATH = "/api/bms_tablet/image"

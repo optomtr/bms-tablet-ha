@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from io import BytesIO
 from pathlib import Path
 import re
@@ -13,7 +14,19 @@ from PIL import Image, UnidentifiedImageError
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
-from .const import BACKGROUND_DIR, BACKGROUND_EXTENSIONS, BACKGROUND_MAX_BYTES, BACKGROUND_URL_PATH, DOMAIN
+from .const import (
+    BACKGROUND_DIR,
+    BACKGROUND_EXTENSIONS,
+    BACKGROUND_MAX_BYTES,
+    BACKGROUND_URL_PATH,
+    DOMAIN,
+    WEB_DIR,
+    WEB_MANIFEST_PATH,
+    WEB_STATIC_PATH,
+    WEB_THEME_COLOR,
+    WEB_TITLE,
+    WEB_URL_PATH,
+)
 from .store import BmsTabletStore, NotLoaded, get_store
 from .validation import BACKGROUND_KEY
 
@@ -165,3 +178,162 @@ class BackgroundImageView(HomeAssistantView):
         if not await self._hass.async_add_executor_job(path.is_file):
             raise web.HTTPNotFound()
         return web.FileResponse(path, headers={"Cache-Control":"private, no-cache", "X-Content-Type-Options":"nosniff"})
+
+
+# ------------------------------------------------------------ веб-версия (iPad)
+#
+# Страница отдаётся без входа: вход делает сама страница через OAuth HA.
+# Поэтому в HTML ничего из запроса не попадает — только файл с диска и
+# постоянный <base>. Хост из запроса идёт лишь в заголовок CSP (ws/wss на
+# себя) и только после строгой проверки.
+
+WEB_BASE_HREF = WEB_STATIC_PATH + "/"
+_BASE_TAG = re.compile(r"<base[\s>/]", re.IGNORECASE)
+_HEAD_TAG = re.compile(r"<head(\s[^>]*)?>", re.IGNORECASE)
+_SAFE_HOST = re.compile(r"(?:[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]{2,45}\])(?::\d{1,5})?")
+
+
+def web_dir() -> Path:
+    return Path(__file__).parent / WEB_DIR
+
+
+def with_base_tag(html: str) -> str:
+    """Добавить <base href="/bms_tablet_web/">, если в файле его нет."""
+    if _BASE_TAG.search(html):
+        return html
+    tag = f'<base href="{WEB_BASE_HREF}">'
+    head = _HEAD_TAG.search(html)
+    if head:
+        return html[: head.end()] + tag + html[head.end():]
+    return tag + html
+
+
+def content_security_policy(host: str | None) -> str:
+    connect = ["'self'"]
+    # Старый Safari не считает ws(s) на свой адрес частью 'self' — пишем явно.
+    if host and _SAFE_HOST.fullmatch(host):
+        connect += [f"wss://{host}", f"ws://{host}"]
+    return "; ".join(
+        [
+            "default-src 'self'",
+            "script-src 'self'",
+            # style="--cols:3" в разметке — атрибуты стилей нужны.
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'self'",
+            "media-src 'self' blob:",
+            "connect-src " + " ".join(connect),
+            "manifest-src 'self'",
+            "worker-src 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'self'",
+        ]
+    )
+
+
+def read_page() -> str | None:
+    try:
+        return (web_dir() / "index.html").read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+class WebPageView(HomeAssistantView):
+    """Страница веб-версии: index.html с <base> и строгим CSP, без кэша."""
+
+    url = WEB_URL_PATH
+    name = DOMAIN + ":web"
+    requires_auth = False
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        html = await self._hass.async_add_executor_job(read_page)
+        if html is None:
+            return web.Response(status=503, text="Веб-версия не установлена", headers={"Cache-Control": "no-store"})
+        return web.Response(
+            text=with_base_tag(html),
+            content_type="text/html",
+            charset="utf-8",
+            headers={
+                "Cache-Control": "no-cache",
+                "Content-Security-Policy": content_security_policy(request.host),
+                "X-Content-Type-Options": "nosniff",
+                "Referrer-Policy": "same-origin",
+            },
+        )
+
+
+# Что веб-версия раздаёт: только свои файлы этих типов, ничего больше.
+WEB_FILE_TYPES = {".html", ".js", ".css", ".png", ".svg", ".ttf", ".woff2", ".json"}
+
+
+def web_file(path: str) -> Path | None:
+    """Файл веб-версии по пути из адреса или None: «..», ссылки наружу и чужие типы — нет."""
+    root = web_dir().resolve()
+    try:
+        target = (root / path).resolve()
+    except (OSError, ValueError):
+        return None
+    if not target.is_relative_to(root) or target.suffix.lower() not in WEB_FILE_TYPES:
+        return None
+    return target if target.is_file() else None
+
+
+class WebStaticView(HomeAssistantView):
+    """Файлы веб-версии с «Cache-Control: no-cache».
+
+    Встроенная раздача HA без кэш-заголовков оставляет решение браузеру, и
+    Safari держал старый скрипт после обновления интеграции: экран iPad
+    собирался из нового HTML и вчерашнего JS. no-cache — браузер каждый раз
+    сверяется с сервером (ответ 304, если файл тот же), дёшево и всегда свежо.
+    """
+
+    url = WEB_STATIC_PATH + "/{path:.+}"
+    name = DOMAIN + ":web:static"
+    requires_auth = False
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+
+    async def get(self, request: web.Request, path: str) -> web.StreamResponse:
+        target = await self._hass.async_add_executor_job(web_file, path)
+        if target is None:
+            raise web.HTTPNotFound()
+        return web.FileResponse(target, headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"})
+
+
+def web_manifest() -> dict:
+    icons = WEB_STATIC_PATH + "/icons"
+    return {
+        "id": WEB_URL_PATH,
+        "name": WEB_TITLE,
+        "short_name": "BMS",
+        "lang": "ru",
+        "start_url": WEB_URL_PATH,
+        "scope": WEB_URL_PATH,
+        "display": "standalone",
+        "background_color": WEB_THEME_COLOR,
+        "theme_color": WEB_THEME_COLOR,
+        "icons": [
+            {"src": f"{icons}/app-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": f"{icons}/app-512.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    }
+
+
+class WebManifestView(HomeAssistantView):
+    url = WEB_MANIFEST_PATH
+    name = DOMAIN + ":web:manifest"
+    requires_auth = False
+
+    async def get(self, request: web.Request) -> web.Response:
+        return web.Response(
+            text=json.dumps(web_manifest(), ensure_ascii=False),
+            content_type="application/manifest+json",
+            charset="utf-8",
+            headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+        )

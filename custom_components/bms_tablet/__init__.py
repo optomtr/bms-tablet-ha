@@ -30,7 +30,14 @@ from .const import (
     PANEL_TITLE,
     PANEL_URL_PATH,
 )
-from .http import BackgroundUploadView, BackgroundImageView, background_dir
+from .http import (
+    BackgroundImageView,
+    BackgroundUploadView,
+    WebManifestView,
+    WebPageView,
+    WebStaticView,
+    background_dir,
+)
 from .store import BmsTabletStore, get_store
 from .pairing import PairingManager
 from .pairing_http import PairingView
@@ -87,6 +94,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(BackgroundUploadView(hass, store))
         hass.http.register_view(BackgroundImageView(hass))
         hass.data[DOMAIN]["view_registered"] = True
+    _async_register_web(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_register_services(hass, store)
@@ -156,6 +164,19 @@ async def _async_register_static(hass: HomeAssistant) -> None:
         ]
     )
     hass.data[DOMAIN]["static_registered"] = True
+
+
+def _async_register_web(hass: HomeAssistant) -> None:
+    """Веб-версия для iPad: страница и манифест без входа (вход — OAuth HA
+    на самой странице). Один раз за запуск HA, как и остальные маршруты."""
+    data = hass.data.setdefault(DOMAIN, {})
+    if data.get("web_views_registered"):
+        return
+    hass.http.register_view(WebPageView(hass))
+    hass.http.register_view(WebManifestView())
+    # Файлы веб-версии — своим маршрутом с no-cache (см. WebStaticView).
+    hass.http.register_view(WebStaticView(hass))
+    data["web_views_registered"] = True
 
 
 async def _async_register_panel(hass: HomeAssistant) -> None:
