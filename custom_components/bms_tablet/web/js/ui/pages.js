@@ -8,7 +8,7 @@ import {
 import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard } from './controls.js';
 import { roomCard } from './photos.js';
 import { musicPage, MUSIC } from './music.js';
-import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit } from '../model/navigation.js';
+import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit, zoneOf, zoneTitle } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
 import { climatesOn, climatesOff, relaysSet, lightsSet, curtainsCommand } from '../model/actions.js';
@@ -59,16 +59,29 @@ function homePage(model, ctx) {
   if (s.airTemp != null) stats.push(stat('Температура в доме', 'ic_thermo', formatTemp(s.airTemp) + '°', 'в доме', 'Климат'));
   if (s.gates > 0 && s.gateZone) stats.push(stat('Ворота', 'premium_gate', gatesLabel(s.gates, s.gatesOpen), 'ворота', 'zone:' + s.gateZone));
   const zoneCols = !ctx.grid.phone && ctx.grid.columns >= 3 ? 2 : 1;
-  const sections = ['Свет', 'Климат', 'Отопление', 'Шторы', ...(ctx.speakers?.length ? [MUSIC] : [])];
+  const sections = homeSections({ music: !!ctx.speakers?.length, youtube: !!ctx.youtube });
   const sectionCols = ctx.grid.phone ? ctx.grid.navColumnsFor(sections.length) : (ctx.grid.columns >= 3 ? Math.min(sections.length, 6) : (sections.length <= 4 ? sections.length : 3));
   return [
     h('div.stats', { 'data-key': 'stats' }, stats),
+    // Дом в одну зону (квартира, один этаж) — комнаты сразу на главной, без строки «1 этаж».
     // Несколько зданий (дача: главный и гостевой дом) — по разделу на здание.
-    ...houseSections(ctx.rooms, model.zoneList, zoneCols),
+    ...(model.zoneList.length === 1
+      ? floorPage(ctx.rooms.filter((r) => zoneOf(r) === model.zoneList[0].zone), zoneTitle(model.zoneList[0].zone), ctx)
+      : houseSections(ctx.rooms, model.zoneList, zoneCols)),
     sectionTitle('Управление'),
     // Стрелка — только на широкой плитке: в портрете без неё «Отопление» не рвётся.
-    grid(sectionCols, sections.map((label) => navTile(label, SECTION_ICON[label], label, 'nav:' + label, roomy(ctx.grid))), 'sections'),
+    grid(sectionCols, sections.map((label) => (label === YOUTUBE
+      // YouTube — не страница дома: открывается приложение YouTube (на iPad — по ссылке).
+      ? press('nav-tile', { act: { ui: 'youtube' }, card: true, label, key: 'nav:' + label }, icon('ic_play'), h('span.label', label), roomy(ctx.grid) ? icon('premium_next', 'next') : null)
+      : navTile(label, SECTION_ICON[label], label, 'nav:' + label, roomy(ctx.grid)))), 'sections'),
   ];
+}
+
+export const YOUTUBE = 'YouTube';
+
+/** Разделы «Управления» на главной — как homeSections() Android-планшета. */
+export function homeSections({ music = false, youtube = false } = {}) {
+  return ['Свет', 'Климат', 'Отопление', 'Шторы', ...(music ? [MUSIC] : []), ...(youtube ? [YOUTUBE] : [])];
 }
 
 const roomy = (g) => !g.phone && (g.cardWidth - 16) / 2 >= 190;

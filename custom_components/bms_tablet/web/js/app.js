@@ -24,7 +24,15 @@ const HOLD_MS = 1000;
 
 const root = document.getElementById('app');
 const states = new Map();
-const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false };
+const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false, youtube: readYouTube() };
+
+// Кнопка YouTube на главной: включают и выключают в меню ☰, помнит каждое устройство своё.
+function readYouTube() {
+  try { return localStorage.getItem('bms-show-youtube') !== '0'; } catch { return true; }
+}
+function saveYouTube(on) {
+  try { localStorage.setItem('bms-show-youtube', on ? '1' : '0'); } catch { /* без памяти */ }
+}
 let house = { rooms: [], settings: {}, weather: null, configured: false };
 let speakers = [];
 /** Реестры для колонок: интеграция плеера и комната. null — не получили (колонки без комнат). */
@@ -166,6 +174,8 @@ function bannerDue() {
 function menu() {
   if (!ui.menu) return null;
   return h('div.menu', { 'data-key': 'menu' },
+    press('action', { act: { ui: 'youtube-toggle' }, on: ui.youtube, label: 'Кнопка YouTube' }, icon('ic_play'),
+      h('span', `Кнопка YouTube: ${ui.youtube ? 'вкл.' : 'выкл.'}`)),
     press('action', { act: { ui: 'reload' }, label: 'Обновить' }, icon('ic_grid'), h('span', 'Обновить страницу')),
     press('action', { act: { ui: 'logout' }, label: 'Выйти' }, icon('ic_close'), h('span', 'Выйти из Home Assistant')));
 }
@@ -195,7 +205,7 @@ function draw(scrollTop) {
   const selected = selectedRooms(list, route);
   const title = pageTitle(route, selected, house.settings?.homeName);
   const g = grid();
-  const ctx = { ui, grid: g, live: status === 'connected', title, weather: house.weather, speakers };
+  const ctx = { ui, grid: g, live: status === 'connected', title, weather: house.weather, speakers, youtube: ui.youtube };
   let body;
   if (!loaded) body = [h('div.splash', h('div', h('img', { src: 'img/bms_wordmark.png', alt: 'BMS' }), status === 'auth_failed' ? 'Не удалось войти в Home Assistant' : 'Подключение к дому…'))];
   else if (!house.configured) body = [h('div.empty', 'Интеграция «BMS Планшеты» не настроена в Home Assistant.')];
@@ -235,6 +245,8 @@ function uiCommand(act) {
     case 'back': return back();
     case 'menu': ui.menu = !ui.menu; return render();
     case 'reload': return location.reload();
+    case 'youtube-toggle': ui.youtube = !ui.youtube; saveYouTube(ui.youtube); return render();
+    case 'youtube': window.open('https://www.youtube.com/', '_blank', 'noopener'); return undefined;
     case 'logout': return logout({ base: location.origin }).finally(() => location.reload());
     case 'target': return stepClimate(act.id, act.up);
     default: musicUiCommand(act); return undefined;
