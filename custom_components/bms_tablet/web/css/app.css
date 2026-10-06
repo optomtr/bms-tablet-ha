@@ -241,6 +241,17 @@ input.search { flex: 2; min-height: var(--control); padding: 0 14px; border-radi
 .radio-item .t { flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .radio-item .play { font-size: 13px; color: var(--gold); }
 
+/* Отопление по вкладке HA: значок, «1 Детская», переключатель */
+.heat-panel-row { display: flex; align-items: center; gap: 14px; min-height: 52px; }
+.heat-panel-row > .ic { width: 24px; height: 24px; color: var(--gold); flex: none; }
+.heat-panel-row.off-line > .ic { color: var(--muted); }
+.heat-panel-row .n { flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heat-panel-row .n small { display: block; font-size: 12px; color: var(--muted); }
+.heat-switch { position: relative; flex: none; width: 58px; height: 34px; padding: 0; border-radius: 17px; }
+.heat-switch .knob { position: absolute; top: 5px; left: 5px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform 160ms ease, background-color 160ms ease; }
+.heat-switch.on { background: var(--gold); border-color: var(--gold); }
+.heat-switch.on .knob { transform: translateX(24px); background: var(--surface); }
+
 /* Отопление: строка «комната · Вкл. · Выкл.» */
 .heat-row { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(59, 59, 56, .5); }
 .heat-row .who { flex: 1; min-width: 0; font-size: 15px; }

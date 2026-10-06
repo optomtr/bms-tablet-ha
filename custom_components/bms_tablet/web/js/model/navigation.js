@@ -3,7 +3,10 @@
 import { isFloorRelated } from './house.js';
 
 /** Подзоны холла из утверждённого дома. entity_id всегда из HA. */
-export const hallSections = Object.freeze(['Центральный холл', 'Левый холл', 'Правый холл', 'Левый коридор', 'Правый коридор', 'Лифтовой коридор', 'Тамбур', 'Левый тамбур', 'Правый тамбур']);
+/** Комната-холл: «Холл», «Холл подвала» — подзоны по hallSections, прочий свет — «Освещение». */
+export const isHallRoom = (cleanName) => cleanName === 'холл' || cleanName.startsWith('холл ');
+
+export const hallSections = Object.freeze(['Центральный холл', 'Левый холл', 'Правый холл', 'Левый коридор', 'Правый коридор', 'Лифтовой коридор', 'Дворовый вход', 'Тамбур', 'Левый тамбур', 'Правый тамбур']);
 const basement = new Set(['кинотеатр', 'детская площадка', 'учебная комната', 'холл подвала', 'котельный', 'котельная', 'левый санузел', 'гардероб', 'кладовая', 'постирочная']);
 const terrace = new Set(['бильярд', 'зона отдыха', 'терраса']);
 const yard = new Set(['двор', 'летняя кухня', 'задний двор', 'навес', 'гараж']);
@@ -218,7 +221,8 @@ export function roomLayout(room) {
  * withRoom — страница нескольких комнат: к подзоне приписываем комнату.
  */
 export function lightSections(room, withRoom = false) {
-  const hall = clean(nameOf(room)) === 'холл';
+  // «Холл» и «Холл подвала» — раскладка холла (как isHallRoom планшета).
+  const hall = isHallRoom(clean(nameOf(room)));
   const groups = byZone(room.lights, hall ? hallZoneAndLabel : plainZone);
   const zoned = [...groups.entries()].filter(([k]) => k !== null).map(([, g]) => ({ title: g.zone, lights: g.items }));
   const rest = groups.get(null)?.items ?? [];

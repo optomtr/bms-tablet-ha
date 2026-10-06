@@ -7,6 +7,7 @@ import { createConnection } from './ha/connection.js';
 import { buildHouse } from './model/house.js';
 import { buildSpeakers } from './model/music.js';
 import { setupMusic, sendMusic, musicUiCommand, startVolume, loadRegistry } from './music-controller.js';
+import { loadHeatingView, resolve as resolveHeating } from './model/heating.js';
 import { serviceCalls, applyAction } from './model/actions.js';
 import { markHallSections } from './model/navigation.js';
 import { selectedRooms, pageTitle } from './model/summary.js';
@@ -24,7 +25,9 @@ const HOLD_MS = 1000;
 
 const root = document.getElementById('app');
 const states = new Map();
-const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false, youtube: readYouTube() };
+// «Отопление» по вкладке «Отопление» из панелей Home Assistant; пусто — раздел собирается сам.
+let heatingSpec = [];
+const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false, youtube: readYouTube(), heatWanted: {} };
 
 // Кнопка YouTube на главной: включают и выключают в меню ☰, помнит каждое устройство своё.
 function readYouTube() {
@@ -205,7 +208,8 @@ function draw(scrollTop) {
   const selected = selectedRooms(list, route);
   const title = pageTitle(route, selected, house.settings?.homeName);
   const g = grid();
-  const ctx = { ui, grid: g, live: status === 'connected', title, weather: house.weather, speakers, youtube: ui.youtube };
+  const ctx = { ui, grid: g, live: status === 'connected', title, weather: house.weather, speakers, youtube: ui.youtube,
+    heating: route === 'Отопление' && heatingSpec.length ? resolveHeating(heatingSpec, states) : [] };
   let body;
   if (!loaded) body = [h('div.splash', h('div', h('img', { src: 'img/bms_wordmark.png', alt: 'BMS' }), status === 'auth_failed' ? 'Не удалось войти в Home Assistant' : 'Подключение к дому…'))];
   else if (!house.configured) body = [h('div.empty', 'Интеграция «BMS Планшеты» не настроена в Home Assistant.')];
@@ -245,6 +249,13 @@ function uiCommand(act) {
     case 'back': return back();
     case 'menu': ui.menu = !ui.menu; return render();
     case 'reload': return location.reload();
+    case 'heat-toggle': {
+      // Переключатель отвечает сразу; правду через миг приносит Home Assistant.
+      ui.heatWanted[act.id] = act.on;
+      setTimeout(() => { if (ui.heatWanted[act.id] === act.on) { delete ui.heatWanted[act.id]; render(); } }, 5000);
+      dispatch({ type: 'ToggleSet', id: act.id, on: act.on });
+      return render();
+    }
     case 'youtube-toggle': ui.youtube = !ui.youtube; saveYouTube(ui.youtube); return render();
     case 'youtube': window.open('https://www.youtube.com/', '_blank', 'noopener'); return undefined;
     case 'logout': return logout({ base: location.origin }).finally(() => location.reload());
@@ -405,6 +416,7 @@ async function start() {
     else if (offlineSince == null) { offlineSince = Date.now(); setTimeout(() => render(), BANNER_DELAY_MS + 100); }
     statusText = detail ? String(detail) : '';
     if (next === 'connected') loadRegistry().then((r) => { registry = r; }).then(loadStates).catch(() => {});
+    if (next === 'connected') loadHeatingView((msg) => conn.sendMessage(msg)).then((spec) => { heatingSpec = spec; render(); }).catch(() => {});
     render();
   });
   await conn.connect();

@@ -3,7 +3,7 @@
 import { CLIMATE_KIND, CLIMATE_KIND_ORDER, roomFans, roomIrrigation, roomMedia, hasSpeed, sensorsEmpty, roomLightsOn } from './devices.js';
 import {
   zoneOf, zones, zoneLabel, zoneTitle, roomPages, pageOf, pageRooms, isGateCover, isCurtain, isFloorHeatingRelay,
-  lightSections, roomLayout,
+  lightSections, roomLayout, isHallRoom,
 } from './navigation.js';
 
 // ---------------------------------------------------------------- форматирование
@@ -185,7 +185,7 @@ export function pageModel(rooms, selected) {
   lazy(m, 'allLightBlocks', () => rooms.flatMap((room) => lightSections(room, true).map((s) => ({ key: `${room.id}/${s.title}`, ...s }))));
   lazy(m, 'curtainRooms', () => rooms.filter((r) => r.covers.some(isCurtain)));
   lazy(m, 'lightBlocks', () => selected.flatMap((room) => lightSections(room, selected.length > 1).map((s) => ({ key: `${room.id}/${s.title}`, ...s }))));
-  lazy(m, 'isHall', () => selected.some((r) => (r.originalName ?? r.name) === 'Холл'));
+  lazy(m, 'isHall', () => selected.some((r) => isHallRoom(String(r.originalName ?? r.name).toLowerCase().replaceAll('ё', 'е').trim())));
   // Страница одной комнаты раскладывается по подзонам; холл и страницы зон — по-старому.
   lazy(m, 'layout', () => (selected.length === 1 && !m.isHall ? roomLayout(selected[0]) : null));
   lazy(m, 'floorRelays', () => m.layout?.floorHeating ?? byId(selected.flatMap((r) => r.toggles).filter(isFloorHeatingRelay)));

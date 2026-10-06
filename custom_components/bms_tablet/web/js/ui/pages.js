@@ -193,6 +193,8 @@ function climatePage(model, outdoor, g, ctx) {
 const KIND_ICON = { AC: 'ic_fan', FLOOR: 'ic_floor', RADIATOR: 'ic_radiator', CONVECTOR: 'ic_radiator' };
 
 function heatingPage(model, outdoor, g, ctx) {
+  // Вкладка «Отопление» есть в панели Home Assistant — раздел ровно как она.
+  if (ctx.heating?.length) return [heatingPanel(ctx.heating, g, ctx)];
   const out = [];
   if (model.heaters.length || model.floorRelaysAll.length) {
     out.push(bulkPair('Отопление', 'Включить отопление', 'Выключить отопление', 'ic_radiator', 'ic_power',
@@ -214,6 +216,21 @@ function heatingPage(model, outdoor, g, ctx) {
     return h('section.card', { 'data-key': 'heat:' + label }, h('div.card-head', h('div.title', label)), ...rows);
   }), g, 'heating'));
   return out;
+}
+
+/** Группы вкладки «Отопление» из HA: значок контура, «1 Детская», переключатель. */
+function heatingPanel(groups, g, ctx) {
+  const wanted = ctx.ui.heatWanted ?? {};
+  return grid(Math.min(g.columns, 2), groups.map((group, gi) => h('section.card', { 'data-key': `hp:${gi}:${group.title}` },
+    h('div.card-head', h('div.title', group.title)),
+    ...group.rows.map((row, ri) => {
+      if (wanted[row.entityId] === row.isOn) delete wanted[row.entityId];
+      const shown = wanted[row.entityId] ?? row.isOn;
+      return h('div.heat-panel-row', { 'data-key': `${ri}:${row.entityId}`, class: row.available ? '' : 'off-line' },
+        icon(row.kind === 'radiator' ? 'ic_radiator' : 'ic_floor'),
+        h('span.n', row.name, row.available ? null : h('small', 'Недоступно')),
+        press('heat-switch', { on: shown, enabled: row.available && ctx.live, label: row.name, act: { ui: 'heat-toggle', id: row.entityId, on: !shown } }, h('i.knob')));
+    }))), 'heating-panel');
 }
 
 function curtainPage(model, g, ctx) {
