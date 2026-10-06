@@ -3,7 +3,7 @@
 import { CLIMATE_KIND, CLIMATE_KIND_ORDER, roomFans, roomIrrigation, roomMedia, hasSpeed, sensorsEmpty, roomLightsOn } from './devices.js';
 import {
   zoneOf, zones, zoneLabel, zoneTitle, roomPages, pageOf, pageRooms, isGateCover, isCurtain, isFloorHeatingRelay,
-  lightSections, roomLayout, isHallRoom,
+  lightSections, roomLayout, isHallRoom, coverGroups,
 } from './navigation.js';
 
 // ---------------------------------------------------------------- форматирование
@@ -208,7 +208,12 @@ export function pageModel(rooms, selected) {
       const tiles = zone.lights.length + zone.toggles.filter((t) => !(t.kind === 'FAN' && hasSpeed(t))).length;
       out.push({ type: 'zone', key: `zone/${zone.title}`, zone, tiles });
     }
-    for (const cover of m.covers) out.push({ type: 'cover', key: `cover/${cover.id}`, cover });
+    // Штор много (холл: окна, боковые, тюль) — группами; мало — карточкой на штору.
+    const grouped = coverGroups(m.covers.filter((c) => !isGateCover(c)), m.isHall);
+    if (grouped) {
+      for (const group of grouped) out.push({ type: 'covers', key: `covers/${group.title}`, group });
+      for (const cover of m.covers.filter(isGateCover)) out.push({ type: 'cover', key: `cover/${cover.id}`, cover });
+    } else for (const cover of m.covers) out.push({ type: 'cover', key: `cover/${cover.id}`, cover });
     // Полив — сразу за шторами и воротами: во дворе это соседи по смыслу.
     if (m.irrigation.length) out.push({ type: 'irrigation', key: 'irrigation', zones: m.irrigation, tiles: m.irrigation.length });
     if (m.floorRelays.length) out.push({ type: 'floor', key: 'floor-heating', relays: m.floorRelays, tiles: m.floorRelays.length });

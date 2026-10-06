@@ -5,10 +5,10 @@ import { h, icon } from './dom.js';
 import {
   press, sectionTitle, emptySection, grid, fullCell, bulkPair, navTile, actionButton,
 } from './components.js';
-import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard } from './controls.js';
+import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard, coverGroupCard } from './controls.js';
 import { roomCard } from './photos.js';
 import { musicPage, MUSIC } from './music.js';
-import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit, zoneOf, zoneTitle } from '../model/navigation.js';
+import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit, zoneOf, zoneTitle, coverGroups, isHallRoom } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
 import { climatesOn, climatesOff, relaysSet, lightsSet, curtainsCommand } from '../model/actions.js';
@@ -242,7 +242,10 @@ function curtainPage(model, g, ctx) {
   if (!model.curtainRooms.length) out.push(emptySection());
   for (const room of model.curtainRooms) {
     out.push(sectionTitle(room.name, 'cr:' + room.id));
-    out.push(cards(room.covers.filter(isCurtain).map((d) => coverCard(d, { key: 'cv:' + d.id, ctx })), g, 'cg:' + room.id));
+    const roomCurtains = room.covers.filter(isCurtain);
+    const grouped = coverGroups(roomCurtains, isHallRoom(String(room.originalName ?? room.name).toLowerCase().replaceAll('ё', 'е').trim()));
+    out.push(cards(grouped ? grouped.map((gr) => coverGroupCard(gr, { key: `cgr:${room.id}:${gr.title}`, ctx }))
+      : roomCurtains.map((d) => coverCard(d, { key: 'cv:' + d.id, ctx })), g, 'cg:' + room.id));
   }
   return out;
 }
@@ -281,6 +284,7 @@ function roomPage(model, selected, g, ctx) {
     const opts = { perRow: g.tilesPerRow(full), full, key: 'pc:' + card.key, ctx };
     switch (card.type) {
       case 'cover': return coverCard(card.cover, opts);
+      case 'covers': return coverGroupCard(card.group, opts);
       case 'zone': return zoneGroup(card.zone.title, card.zone.lights, card.zone.toggles, opts);
       case 'floor': return floorHeatingCard(card.relays, opts);
       case 'irrigation': return irrigationCard(card.zones, opts);

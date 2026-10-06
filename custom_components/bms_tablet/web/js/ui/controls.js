@@ -3,7 +3,7 @@
 // CurtainControl.kt, VentilationControl.kt и ZoneGroup из PremiumHome.kt.
 
 import { h, icon } from './dom.js';
-import { press, group, tiles, tile, lamp, actionButton, holdButton, lightIcon, equipmentIcon, configured } from './components.js';
+import { press, group, group as group_, tiles, tile, lamp, actionButton, holdButton, lightIcon, equipmentIcon, configured } from './components.js';
 import { availableModes, HVAC, speedSteps, hasSpeed, speedLabel } from '../model/devices.js';
 import { formatTemp } from '../model/summary.js';
 import { isGateCover } from '../model/navigation.js';
@@ -217,6 +217,27 @@ export function coverCard(device, { key, ctx }) {
 }
 
 const COMMAND_RU = { open: 'Открыть', stop: 'Стоп', close: 'Закрыть' };
+
+const coverState = (d) => (!d.available ? 'Недоступно' : d.isOpening ? 'Открывается' : d.isClosing ? 'Закрывается'
+  : d.position == null ? 'Положение неизвестно' : d.position === 0 ? 'Закрыто' : d.position === 100 ? 'Открыто' : `Открыто · ${d.position}%`);
+
+/** Группа штор одной карточкой (CoverGroupCard): строки «1…9» с «открыть / стоп / закрыть», в шапке — вся группа. */
+export function coverGroupCard(group, { key, ctx }) {
+  // Прямо приборам группы: общий «закрыть все шторы» отбрасывает «Окно N».
+  const all = (open) => group.rows.filter((r) => r.device.available).map((r) => ({ type: 'Cover', id: r.device.id, command: open ? 'open' : 'close' }));
+  const head = h('div.cover-group-all', ['open', 'close'].map((command) => {
+    const acts = all(command === 'open');
+    return press('btn-icon', { enabled: ctx.live && acts.length > 0, act: acts.length ? { batch: acts } : null,
+      label: `${COMMAND_RU[command]} все · ${group.title}` }, curtainIcon(command, 'center'));
+  }));
+  return group_(group.title, { key, action: head }, ...group.rows.map(({ label, device }) => {
+    const live = device.available && ctx.live;
+    return h('div.cover-row', { 'data-key': device.id, class: device.available ? '' : 'off-line' },
+      h('span.n', label, h('small', coverState(device))),
+      ...['open', 'stop', 'close'].map((command) => press('', { enabled: live, act: { type: 'Cover', id: device.id, command },
+        label: `${COMMAND_RU[command]} ${device.name}` }, curtainIcon(command, device.direction))));
+  }));
+}
 
 /** Золото — ткань: закрыто — вся планка, открыто — зазор. */
 function rail(device) {

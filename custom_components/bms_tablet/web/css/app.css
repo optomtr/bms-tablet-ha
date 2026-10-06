@@ -241,6 +241,15 @@ input.search { flex: 2; min-height: var(--control); padding: 0 14px; border-radi
 .radio-item .t { flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .radio-item .play { font-size: 13px; color: var(--gold); }
 
+/* Группа штор: строка «1 · Закрыто» и три кнопки; в шапке — открыть/закрыть все */
+.cover-group-all { display: flex; gap: 8px; }
+.cover-row { display: flex; align-items: center; gap: 8px; min-height: 52px; }
+.cover-row .n { flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cover-row .n small { display: block; font-size: 12px; color: var(--muted); }
+.cover-row .press { width: 60px; height: 48px; flex: none; display: grid; place-items: center; }
+.cover-row .press svg, .cover-group-all svg { width: 28px; height: 28px; color: var(--ink); }
+.cover-row.off-line .n { color: var(--muted); }
+
 /* Отопление по вкладке HA: значок, «1 Детская», переключатель */
 .heat-panel-row { display: flex; align-items: center; gap: 14px; min-height: 52px; }
 .heat-panel-row > .ic { width: 24px; height: 24px; color: var(--gold); flex: none; }

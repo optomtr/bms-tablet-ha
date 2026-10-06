@@ -277,3 +277,46 @@ export function groupLights(lights) {
   // Склейка не помогла (все названия разные) — плоский список.
   return groups.length === lights.length ? single() : groups;
 }
+
+// Шторы комнаты группами — порт CoverGroups.kt. Владелец: «в холле куча окон и штор,
+// надо сгруппировать». С COVER_GROUP_MIN штор: подзона («Левый холл»: «Тюль»),
+// серия с номером («Окна»: «1…9»), остальное — «Шторы».
+export const COVER_GROUP_MIN = 5;
+
+function seriesTitle(base) {
+  const words = base.split(' ');
+  const last = words[words.length - 1];
+  const plural = { 'окно': 'окна', 'штора': 'шторы' }[last.toLowerCase()];
+  const fixed = plural ? (last[0] === last[0].toUpperCase() ? plural[0].toUpperCase() + plural.slice(1) : plural) : last;
+  return [...words.slice(0, -1), fixed].join(' ');
+}
+
+/** Группы штор [{title, rows:[{label, device}]}]; null — штор мало, каждая своей карточкой. */
+export function coverGroups(covers, hall) {
+  if (covers.length < COVER_GROUP_MIN) return null;
+  const groups = new Map();
+  const add = (title, label, number, device) => {
+    const key = clean(title);
+    if (!groups.has(key)) groups.set(key, { title, items: [] });
+    groups.get(key).items.push({ number, label, device });
+  };
+  const sections = [...hallSections].sort((a, b) => b.length - a.length);
+  for (const cover of covers) {
+    const { zone, label } = zoneAndLabel(cover.name, cover.zone);
+    if (zone) { add(zone, label.startsWith(zone) ? label.slice(zone.length).trim() || label : label, null, cover); continue; }
+    const section = hall ? sections.find((s) => clean(cover.name).includes(clean(s))) : null;
+    if (section) {
+      const rest = cover.name.replace(new RegExp(escapeRe(section), 'i'), '').trim();
+      add(section, rest ? cap(rest) : cover.name, null, cover);
+      continue;
+    }
+    const m = /^(.*\S)\s+(\d+)$/.exec(cover.name.trim());
+    if (m) add(seriesTitle(m[1]), m[2], Number(m[2]), cover);
+    else add('Шторы', cover.name, null, cover);
+  }
+  return [...groups.values()].map(({ title, items }) => ({
+    title,
+    rows: items.map((x, i) => ({ ...x, i })).sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || a.i - b.i)
+      .map(({ label, device }) => ({ label, device })),
+  }));
+}
