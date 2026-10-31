@@ -2,7 +2,7 @@
 
 import { h, icon } from './dom.js';
 import { press, sectionTitle, grid, actionButton, emptySection } from './components.js';
-import { cameraRooms, snapshotUrl } from '../model/cameras.js';
+import { cameraRooms } from '../model/cameras.js';
 
 export function cameraPage(rooms, g, ctx) {
   const list = cameraRooms(rooms);
@@ -18,10 +18,11 @@ export function cameraPage(rooms, g, ctx) {
 }
 
 function cameraTile(camera, ctx) {
-  const src = camera.available ? snapshotUrl(camera, ctx.ui.camTick ?? 0) : null;
+  // Только полностью загруженный кадр (его грузит app.js в фоне): недогруженный не показываем.
+  const src = camera.available ? ctx.ui.camFrames?.[camera.id] ?? null : null;
   return press('cam-tile', { key: 'cam:' + camera.id, label: camera.name, enabled: camera.available,
     act: { ui: 'camera-open', id: camera.id } },
-  src ? h('img', { src, alt: '', loading: 'lazy' }) : icon('ic_camera', 'cam-none'),
+  src ? h('img', { src, alt: '' }) : icon('ic_camera', 'cam-none'),
   h('span.cam-name', h('span.t', camera.name), camera.available ? icon('premium_next', 'next') : h('small', 'Недоступна')));
 }
 

@@ -8,7 +8,7 @@ import { buildHouse } from './model/house.js';
 import { buildSpeakers } from './model/music.js';
 import { setupMusic, sendMusic, musicUiCommand, startVolume, loadRegistry } from './music-controller.js';
 import { loadHeatingView, resolve as resolveHeating } from './model/heating.js';
-import { CAMERAS, mjpegUrl, canPlayHls } from './model/cameras.js';
+import { CAMERAS, mjpegUrl, canPlayHls, snapshotUrl, dueCameras } from './model/cameras.js';
 import { serviceCalls, applyAction } from './model/actions.js';
 import { markHallSections } from './model/navigation.js';
 import { selectedRooms, pageTitle } from './model/summary.js';
@@ -417,12 +417,24 @@ async function openCamera(id) {
   render();
 }
 
-// Снимки на странице «Камеры» — раз в 5 секунд, пока страница на экране.
+// Снимки на странице «Камеры»: в фоне, по одному на камеру, следующий — через
+// 10 с после того, как дошёл предыдущий; на экран — только загруженный целиком.
+const camLoads = {};
+ui.camFrames = {};
 setInterval(() => {
   if (route !== CAMERAS || ui.camera || document.visibilityState !== 'visible') return;
-  ui.camTick = Math.floor(Date.now() / 5000);
-  render();
-}, 5000);
+  const cameras = rooms().flatMap((r) => r.cameras ?? []);
+  const now = Date.now();
+  for (const id of dueCameras(cameras, camLoads, now)) {
+    const camera = cameras.find((c) => c.id === id);
+    const url = snapshotUrl(camera, now);
+    camLoads[id] = { busy: true, doneAt: camLoads[id]?.doneAt ?? 0 };
+    const img = new Image();
+    img.onload = () => { camLoads[id] = { busy: false, doneAt: Date.now() }; ui.camFrames[id] = url; render(); };
+    img.onerror = () => { camLoads[id] = { busy: false, doneAt: Date.now() }; };
+    img.src = url;
+  }
+}, 1000);
 
 async function start() {
   tickClock();

@@ -26,3 +26,22 @@ export function mjpegUrl(camera) {
 export function canPlayHls(video) {
   return !!video && typeof video.canPlayType === 'function' && video.canPlayType('application/vnd.apple.mpegurl') !== '';
 }
+
+/** Пауза между снимками одной камеры после того, как предыдущий дошёл. */
+export const SNAPSHOT_EVERY_MS = 10_000;
+
+/**
+ * Каким камерам пора за новым снимком. Снимок generic-камеры — около 450 КБ, а
+ * через туннель он идёт 5–7 с: раньше страница каждые 5 с бросала недогруженный
+ * кадр и начинала новый (53 запроса за 12 с, догружены 3 картинки из 10).
+ * Теперь на камеру — не больше одной загрузки, следующая — через паузу после
+ * того, как дошла предыдущая (или упала). state: id → {busy, doneAt}.
+ */
+export function dueCameras(cameras, state, now, everyMs = SNAPSHOT_EVERY_MS) {
+  return cameras.filter((c) => {
+    if (!c.available || !c.picture) return false;
+    const s = state[c.id];
+    if (!s) return true;
+    return !s.busy && now - (s.doneAt ?? 0) >= everyMs;
+  }).map((c) => c.id);
+}
