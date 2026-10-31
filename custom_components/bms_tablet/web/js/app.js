@@ -8,7 +8,7 @@ import { buildHouse } from './model/house.js';
 import { buildSpeakers } from './model/music.js';
 import { setupMusic, sendMusic, musicUiCommand, startVolume, loadRegistry } from './music-controller.js';
 import { loadHeatingView, resolve as resolveHeating } from './model/heating.js';
-import { CAMERAS, mjpegUrl, canPlayHls, snapshotUrl, dueCameras } from './model/cameras.js';
+import { CAMERAS, mjpegUrl, snapshotUrl, dueCameras } from './model/cameras.js';
 import { serviceCalls, applyAction } from './model/actions.js';
 import { markHallSections } from './model/navigation.js';
 import { selectedRooms, pageTitle } from './model/summary.js';
@@ -224,7 +224,6 @@ function draw(scrollTop) {
     h('main.page', { 'data-key': 'page:' + route }, body),
     menu());
   morph(root, tree);
-  startCameraVideo();
   restoreHold();
   if (scrollTop) root.querySelector('.page')?.scrollTo(0, 0);
 }
@@ -401,45 +400,16 @@ async function keepAwake() {
  * кадров camera_proxy_stream. Видео не вышло — так и пишем.
  */
 /**
- * Видео камеры: без звука и само (браузеры, iPhone тоже, не запускают видео со
- * звуком без касания; атрибут muted, поставленный после создания элемента, не
- * действует — нужно свойство). Поток не пошёл за 15 с или ошибка — кадры.
+ * Живая картинка камеры — поток кадров (camera_proxy_stream): открывается сразу
+ * и на iPhone, и на компьютере. HLS через туннель на доме владельца так и не
+ * запустился (список потока отдавался 5–13 с на запрос) — человек ждал бы
+ * чёрный экран.
  */
-function startCameraVideo() {
-  const v = root.querySelector('video.cam-live');
-  const view = ui.camera;
-  if (!v || !view || v._bmsStarted === view) return;
-  v._bmsStarted = view;
-  v.muted = true;
-  v.playsInline = true;
-  v.play().catch(() => {});
-  const fallback = () => {
-    if (ui.camera !== view || !view.hls) return;
-    const camera = rooms().flatMap((r) => r.cameras ?? []).find((c) => c.id === view.id);
-    view.hls = null;
-    view.mjpeg = mjpegUrl(camera);
-    view.failed = !view.mjpeg;
-    render();
-  };
-  v.addEventListener('error', fallback, { once: true });
-  setTimeout(() => { if (v.readyState < 2) fallback(); }, 15000);
-}
-
-async function openCamera(id) {
+function openCamera(id) {
   const camera = rooms().flatMap((r) => r.cameras ?? []).find((c) => c.id === id);
   if (!camera) return;
-  const view = { id, hls: null, mjpeg: null, failed: false };
-  ui.camera = view;
-  render();
-  if (canPlayHls(document.createElement('video'))) {
-    try {
-      const res = await conn.sendMessage({ type: 'camera/stream', entity_id: id, format: 'hls' });
-      if (ui.camera === view && res?.url) { view.hls = res.url; render(); return; }
-    } catch { /* нет потока — пробуем кадры */ }
-  }
-  if (ui.camera !== view) return;
-  view.mjpeg = mjpegUrl(camera);
-  view.failed = !view.mjpeg;
+  const mjpeg = mjpegUrl(camera);
+  ui.camera = { id, mjpeg, failed: !mjpeg };
   render();
 }
 

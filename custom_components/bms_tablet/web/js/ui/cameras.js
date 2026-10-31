@@ -26,13 +26,12 @@ function cameraTile(camera, ctx) {
   h('span.cam-name', h('span.t', camera.name), camera.available ? icon('premium_next', 'next') : h('small', 'Недоступна')));
 }
 
-/** Живое видео: HLS там, где браузер его играет (iPhone), иначе поток кадров. */
+/** Живая картинка камеры во весь экран — поток кадров. */
 function cameraViewer(view, rooms) {
   const camera = rooms.flatMap((r) => r.cameras ?? []).find((c) => c.id === view.id);
   let body;
-  if (view.hls) body = h('video.cam-live', { 'data-key': 'live:' + view.hls, src: view.hls, autoplay: '', muted: '', playsinline: '', 'webkit-playsinline': '' });
-  else if (view.mjpeg) body = h('img.cam-live', { 'data-key': 'mjpeg:' + view.mjpeg, src: view.mjpeg, alt: '' });
-  else body = h('div.empty', view.failed ? 'Видео не открылось — Home Assistant не ответил' : 'Подключаемся к камере…');
+  if (view.mjpeg) body = h('img.cam-live', { 'data-key': 'mjpeg:' + view.mjpeg, src: view.mjpeg, alt: '' });
+  else body = h('div.empty', 'У камеры нет картинки — проверьте её в Home Assistant');
   return h('div.sheet-back.cam-back', { 'data-key': 'camera-view', 'data-act': JSON.stringify({ ui: 'camera-close' }) },
     h('section.card.sheet.cam-sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
       h('div.card-head', h('div.title', camera?.name ?? 'Камера'), actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'camera-close' } })),
