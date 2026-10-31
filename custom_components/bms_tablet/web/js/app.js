@@ -224,6 +224,7 @@ function draw(scrollTop) {
     h('main.page', { 'data-key': 'page:' + route }, body),
     menu());
   morph(root, tree);
+  startCameraVideo();
   restoreHold();
   if (scrollTop) root.querySelector('.page')?.scrollTo(0, 0);
 }
@@ -399,6 +400,31 @@ async function keepAwake() {
  * поток (camera/stream). Где HLS не играется (Chrome на компьютере), — поток
  * кадров camera_proxy_stream. Видео не вышло — так и пишем.
  */
+/**
+ * Видео камеры: без звука и само (браузеры, iPhone тоже, не запускают видео со
+ * звуком без касания; атрибут muted, поставленный после создания элемента, не
+ * действует — нужно свойство). Поток не пошёл за 15 с или ошибка — кадры.
+ */
+function startCameraVideo() {
+  const v = root.querySelector('video.cam-live');
+  const view = ui.camera;
+  if (!v || !view || v._bmsStarted === view) return;
+  v._bmsStarted = view;
+  v.muted = true;
+  v.playsInline = true;
+  v.play().catch(() => {});
+  const fallback = () => {
+    if (ui.camera !== view || !view.hls) return;
+    const camera = rooms().flatMap((r) => r.cameras ?? []).find((c) => c.id === view.id);
+    view.hls = null;
+    view.mjpeg = mjpegUrl(camera);
+    view.failed = !view.mjpeg;
+    render();
+  };
+  v.addEventListener('error', fallback, { once: true });
+  setTimeout(() => { if (v.readyState < 2) fallback(); }, 15000);
+}
+
 async function openCamera(id) {
   const camera = rooms().flatMap((r) => r.cameras ?? []).find((c) => c.id === id);
   if (!camera) return;
