@@ -13,7 +13,7 @@ export function cameraPage(rooms, g, ctx) {
     if (list.length > 1) out.push(sectionTitle(room.name, 'cam-title:' + room.id));
     out.push(grid(g.phone ? 1 : Math.min(g.columns, 3), room.cameras.map((c) => cameraTile(c, ctx)), 'cams:' + room.id));
   }
-  if (ctx.ui.camera) out.push(cameraViewer(ctx.ui.camera, rooms));
+  if (ctx.ui.camera) out.push(cameraViewer(ctx.ui.camera, rooms, ctx));
   return out;
 }
 
@@ -27,11 +27,15 @@ function cameraTile(camera, ctx) {
 }
 
 /** Живая картинка камеры во весь экран — поток кадров. */
-function cameraViewer(view, rooms) {
+function cameraViewer(view, rooms, ctx) {
   const camera = rooms.flatMap((r) => r.cameras ?? []).find((c) => c.id === view.id);
-  let body;
-  if (view.mjpeg) body = h('img.cam-live', { 'data-key': 'mjpeg:' + view.mjpeg, src: view.mjpeg, alt: '' });
-  else body = h('div.empty', 'У камеры нет картинки — проверьте её в Home Assistant');
+  // Первый живой кадр через туннель идёт 5–9 с — до него виден последний снимок этой камеры.
+  const still = ctx.ui.camFrames?.[view.id];
+  const body = view.mjpeg
+    ? h('div.cam-stage', { 'data-key': 'stage:' + view.id },
+      still ? h('img.cam-still', { src: still, alt: '' }) : null,
+      h('img.cam-live', { 'data-key': 'mjpeg:' + view.mjpeg, src: view.mjpeg, alt: '' }))
+    : h('div.empty', 'У камеры нет картинки — проверьте её в Home Assistant');
   return h('div.sheet-back.cam-back', { 'data-key': 'camera-view', 'data-act': JSON.stringify({ ui: 'camera-close' }) },
     h('section.card.sheet.cam-sheet', { 'data-act': JSON.stringify({ ui: 'none' }) },
       h('div.card-head', h('div.title', camera?.name ?? 'Камера'), actionButton('Закрыть', { iconName: 'ic_close', act: { ui: 'camera-close' } })),
