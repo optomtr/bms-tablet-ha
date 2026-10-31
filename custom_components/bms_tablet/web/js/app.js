@@ -8,6 +8,7 @@ import { buildHouse } from './model/house.js';
 import { buildSpeakers } from './model/music.js';
 import { setupMusic, sendMusic, musicUiCommand, startVolume, loadRegistry } from './music-controller.js';
 import { loadHeatingView, resolve as resolveHeating } from './model/heating.js';
+import { CAMERAS, mjpegUrl, canPlayHls } from './model/cameras.js';
 import { serviceCalls, applyAction } from './model/actions.js';
 import { markHallSections } from './model/navigation.js';
 import { selectedRooms, pageTitle } from './model/summary.js';
@@ -65,6 +66,8 @@ function go(next) {
   parent = route;
   route = next;
   ui.menu = false;
+  ui.camera = null; // ушли со страницы — видео закрыто
+
   // Полный путь: у страницы <base href>, и голый «#…» увёл бы адрес на /bms_tablet_web/.
   history.replaceState(null, '', location.pathname + location.search + '#' + encodeURIComponent(next));
   render({ scrollTop: true });
@@ -256,6 +259,8 @@ function uiCommand(act) {
       dispatch({ type: 'ToggleSet', id: act.id, on: act.on });
       return render();
     }
+    case 'camera-open': openCamera(act.id); return undefined;
+    case 'camera-close': ui.camera = null; return render();
     case 'youtube-toggle': ui.youtube = !ui.youtube; saveYouTube(ui.youtube); return render();
     case 'youtube': window.open('https://www.youtube.com/', '_blank', 'noopener'); return undefined;
     case 'logout': return logout({ base: location.origin }).finally(() => location.reload());
@@ -388,6 +393,36 @@ async function keepAwake() {
   // iPad гаснет сам; на iPadOS 18.4+ у приложения с экрана «Домой» это можно запретить.
   try { if (document.visibilityState === 'visible') await navigator.wakeLock?.request('screen'); } catch { /* нельзя — не беда */ }
 }
+
+/**
+ * Живое видео камеры. iPhone/iPad играют HLS сами — просим у Home Assistant
+ * поток (camera/stream). Где HLS не играется (Chrome на компьютере), — поток
+ * кадров camera_proxy_stream. Видео не вышло — так и пишем.
+ */
+async function openCamera(id) {
+  const camera = rooms().flatMap((r) => r.cameras ?? []).find((c) => c.id === id);
+  if (!camera) return;
+  const view = { id, hls: null, mjpeg: null, failed: false };
+  ui.camera = view;
+  render();
+  if (canPlayHls(document.createElement('video'))) {
+    try {
+      const res = await conn.sendMessage({ type: 'camera/stream', entity_id: id, format: 'hls' });
+      if (ui.camera === view && res?.url) { view.hls = res.url; render(); return; }
+    } catch { /* нет потока — пробуем кадры */ }
+  }
+  if (ui.camera !== view) return;
+  view.mjpeg = mjpegUrl(camera);
+  view.failed = !view.mjpeg;
+  render();
+}
+
+// Снимки на странице «Камеры» — раз в 5 секунд, пока страница на экране.
+setInterval(() => {
+  if (route !== CAMERAS || ui.camera || document.visibilityState !== 'visible') return;
+  ui.camTick = Math.floor(Date.now() / 5000);
+  render();
+}, 5000);
 
 async function start() {
   tickClock();

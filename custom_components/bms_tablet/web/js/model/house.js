@@ -392,7 +392,8 @@ export function buildRoomsFromConfig(config, states) {
           toggles.push(id.startsWith('fan.') ? fanFrom(id, label, st) : toggleDevice({ id, kind: 'FAN', name: label, isOn: on }));
           break;
         case 'irrigation': toggles.push(toggleDevice({ id, kind: 'IRRIGATION', name: label, isOn: on })); break;
-        case 'camera': cameras.push(cameraDevice({ id, name: label, available: isUsableState(st.state) })); break;
+        // entity_picture — снимок с токеном камеры (HA меняет токен сам, приходит новым состоянием).
+        case 'camera': cameras.push(cameraDevice({ id, name: label, available: isUsableState(st.state), picture: typeof st.attributes?.entity_picture === 'string' ? st.attributes.entity_picture : null })); break;
         case 'tv': case 'media': case 'other': {
           const kind = role === 'tv' ? 'TV' : role === 'media' ? 'MEDIA' : 'OTHER';
           const isOn = id.startsWith('media_player.') ? !MEDIA_OFF_STATES.has(String(st.state).toLowerCase()) : on;

@@ -8,6 +8,8 @@ import {
 import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard, coverGroupCard } from './controls.js';
 import { roomCard } from './photos.js';
 import { musicPage, MUSIC } from './music.js';
+import { cameraPage } from './cameras.js';
+import { CAMERAS, hasCameras } from '../model/cameras.js';
 import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit, zoneOf, zoneTitle, coverGroups, isHallRoom } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
@@ -47,6 +49,7 @@ export function renderPage(route, rooms, selected, ctx) {
   if (route === 'Свет') return lightPage(model, g, ctx);
   if (route === 'Шторы') return curtainPage(model, g, ctx);
   if (route === MUSIC) return musicPage(ctx.speakers ?? [], g, ctx);
+  if (route === CAMERAS) return cameraPage(rooms, g, ctx);
   return roomPage(model, selected, g, ctx);
 }
 
@@ -59,7 +62,7 @@ function homePage(model, ctx) {
   if (s.airTemp != null) stats.push(stat('Температура в доме', 'ic_thermo', formatTemp(s.airTemp) + '°', 'в доме', 'Климат'));
   if (s.gates > 0 && s.gateZone) stats.push(stat('Ворота', 'premium_gate', gatesLabel(s.gates, s.gatesOpen), 'ворота', 'zone:' + s.gateZone));
   const zoneCols = !ctx.grid.phone && ctx.grid.columns >= 3 ? 2 : 1;
-  const sections = homeSections({ music: !!ctx.speakers?.length, youtube: !!ctx.youtube });
+  const sections = homeSections({ music: !!ctx.speakers?.length, youtube: !!ctx.youtube, cameras: hasCameras(ctx.rooms ?? []) });
   const sectionCols = ctx.grid.phone ? ctx.grid.navColumnsFor(sections.length) : (ctx.grid.columns >= 3 ? Math.min(sections.length, 6) : (sections.length <= 4 ? sections.length : 3));
   return [
     h('div.stats', { 'data-key': 'stats' }, stats),
@@ -80,8 +83,8 @@ function homePage(model, ctx) {
 export const YOUTUBE = 'YouTube';
 
 /** Разделы «Управления» на главной — как homeSections() Android-планшета. */
-export function homeSections({ music = false, youtube = false } = {}) {
-  return ['Свет', 'Климат', 'Отопление', 'Шторы', ...(music ? [MUSIC] : []), ...(youtube ? [YOUTUBE] : [])];
+export function homeSections({ music = false, youtube = false, cameras = false } = {}) {
+  return ['Свет', 'Климат', 'Отопление', 'Шторы', ...(music ? [MUSIC] : []), ...(cameras ? [CAMERAS] : []), ...(youtube ? [YOUTUBE] : [])];
 }
 
 const roomy = (g) => !g.phone && (g.cardWidth - 16) / 2 >= 190;
@@ -94,7 +97,7 @@ function houseSections(rooms, rows, cols) {
   ]);
 }
 
-const SECTION_ICON = { 'Свет': 'ic_light', 'Климат': 'ic_fan', 'Отопление': 'ic_radiator', 'Шторы': 'ic_curtain', [MUSIC]: 'ic_music' };
+const SECTION_ICON = { 'Свет': 'ic_light', 'Климат': 'ic_fan', 'Отопление': 'ic_radiator', 'Шторы': 'ic_curtain', [MUSIC]: 'ic_music', 'Камеры': 'ic_camera' };
 
 function stat(description, iconName, big, small, nav) {
   return press('stat', { nav, label: description },
