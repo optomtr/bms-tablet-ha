@@ -286,10 +286,11 @@ function roomPage(model, selected, g, ctx) {
   }
   const multi = selected.length > 1;
   // Термостаты общей карточки — только когда она раскрыта.
-  const list = model.cards().filter((card) => !card.memberOf || ctx.ui.climateOpen?.[card.memberOf]).map((card) => {
+  const render = (card) => {
     const full = g.spansFull(card.tiles ?? 0);
     const opts = { perRow: g.tilesPerRow(full), full, key: 'pc:' + card.key, ctx };
     switch (card.type) {
+      case 'stack': return h('div.stack', { 'data-key': 'pc:' + card.key }, ...card.items.map(render));
       case 'cover': return coverCard(card.cover, opts);
       case 'covers': return coverGroupCard(card.group, opts);
       case 'zone': return zoneGroup(card.zone.title, card.zone.lights, card.zone.toggles, opts);
@@ -300,7 +301,9 @@ function roomPage(model, selected, g, ctx) {
       case 'climate': return climateCard(card.device, multi ? card.room.name : KIND_RU[card.device.kind], { key: 'pc:' + card.key, ctx });
       default: return null;
     }
-  }).filter(Boolean).map((el) => fullCell(el, el.classList.contains('full')));
+  };
+  const list = model.cards().filter((card) => !card.memberOf || ctx.ui.climateOpen?.[card.memberOf]).map(render)
+    .filter(Boolean).map((el) => fullCell(el, el.classList.contains('full')));
   if (list.length) out.push(cards(list, g, 'room-cards'));
   out.push(...fanRows(model.fans, g, ctx));
   if (!selected.length) out.push(emptySection());

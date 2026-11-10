@@ -233,9 +233,26 @@ export function pageModel(rooms, selected) {
       for (const c of members) out.push({ type: 'climate', key: `climate/${c.device.id}`, room: c.room, device: c.device, memberOf: key });
     }
     if (m.media.length) out.push({ type: 'media', key: 'media', devices: m.media, tiles: m.media.length });
-    return out;
+    return stackSmallCovers(out);
   };
   return m;
+}
+
+/** Группа штор из стольких строк и меньше — «маленькая»: две такие делят одну ячейку. */
+export const SMALL_COVER_ROWS = 2;
+
+/**
+ * Маленькие группы штор («Правый холл»: тюль и шторы) — парами в одну ячейку, одна над
+ * другой, на месте первой из пары: в ряду с высокой карточкой каждая была бы в рост соседки
+ * (владелец, 10.11.2026). Нечётная последняя остаётся одна.
+ */
+export function stackSmallCovers(cards) {
+  const small = cards.filter((c) => c.type === 'covers' && c.group.rows.length <= SMALL_COVER_ROWS);
+  const pairs = new Map();
+  for (let i = 0; i + 1 < small.length; i += 2) pairs.set(small[i], small[i + 1]);
+  const partners = new Set(pairs.values());
+  return cards.filter((c) => !partners.has(c))
+    .map((c) => (pairs.has(c) ? { type: 'stack', key: `stack/${c.key}`, items: [c, pairs.get(c)] } : c));
 }
 
 /** Виды термостатов, которые на странице комнаты собираются в одну общую карточку. */
