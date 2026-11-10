@@ -126,6 +126,28 @@ export function floorSplit(pages, order) {
   return { featured: sorted.filter((r) => !isUtilityRoom(r)), others: sorted.filter(isUtilityRoom) };
 }
 
+/** Ключ страницы группы комнат («Зона бабушки» → спальня, гардероб, санузел). */
+export const GROUP_PREFIX = 'group:';
+const groupOf = (room) => (isBlank(room.group) ? null : room.group.trim());
+
+/**
+ * Плитки этажа с группами: комнаты одной группы — одна карточка на месте первой из них,
+ * {room, nav, title}; внутри группы — обычные карточки комнат. Санузлы группы тоже уходят в неё.
+ */
+export function floorCards(pages, order) {
+  const { featured, others } = floorSplit(pages, order);
+  const seen = new Set();
+  const card = (room) => {
+    const g = groupOf(room);
+    if (g === null) return { room, nav: 'room:' + pageKey(room), title: pageOf(room) };
+    if (seen.has(g)) return null;
+    seen.add(g);
+    return { room, nav: GROUP_PREFIX + g, title: g };
+  };
+  const cards = [...featured, ...others.filter((r) => groupOf(r) !== null)].map(card).filter(Boolean);
+  return { cards, others: others.filter((r) => groupOf(r) === null) };
+}
+
 /** Санузел и туалет — маленькой плиткой внизу этажа (владелец, 01.10.2026). */
 export function isUtilityRoom(room) {
   const name = clean(pageOf(room));
@@ -217,7 +239,8 @@ export function roomLayout(room) {
 
 /**
  * Группы света комнаты [{title, lights}]: свет без подзоны и по группе на подзону.
- * Холл — подзоны в порядке hallSections, свет без подзоны последним («Освещение»).
+ * Холл — основной свет первым («Освещение»), затем правый блок, затем левый, затем прочие
+ * подзоны (владелец, 10.11.2026); внутри блока — порядок hallSections.
  * withRoom — страница нескольких комнат: к подзоне приписываем комнату.
  */
 export function lightSections(room, withRoom = false) {
@@ -228,8 +251,10 @@ export function lightSections(room, withRoom = false) {
   const rest = groups.get(null)?.items ?? [];
   if (hall) {
     const rank = (z) => { const i = hallSections.findIndex((s) => clean(s) === clean(z)); return i < 0 ? Infinity : i; };
-    const sorted = [...zoned].sort((a, b) => (rank(a.title) === rank(b.title) ? 0 : rank(a.title) < rank(b.title) ? -1 : 1));
-    return [...sorted, { title: 'Освещение', lights: rest }].filter((s) => s.lights.length);
+    const side = (z) => (clean(z).startsWith('прав') ? 0 : clean(z).startsWith('лев') ? 1 : 2);
+    const cmpRank = (a, b) => (rank(a) === rank(b) ? 0 : rank(a) < rank(b) ? -1 : 1);
+    const sorted = [...zoned].sort((a, b) => side(a.title) - side(b.title) || cmpRank(a.title, b.title));
+    return [{ title: 'Освещение', lights: rest }, ...sorted].filter((s) => s.lights.length);
   }
   return [{ title: room.name, lights: rest }, ...zoned.map((z) => ({ title: withRoom ? `${room.name} · ${z.title}` : z.title, lights: z.lights }))]
     .filter((s) => s.lights.length);

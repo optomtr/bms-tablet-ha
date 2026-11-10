@@ -10,7 +10,7 @@ import { setupMusic, sendMusic, musicUiCommand, startVolume, loadRegistry } from
 import { loadHeatingView, resolve as resolveHeating } from './model/heating.js';
 import { CAMERAS, mjpegUrl, snapshotUrl, dueCameras } from './model/cameras.js';
 import { serviceCalls, applyAction } from './model/actions.js';
-import { markHallSections } from './model/navigation.js';
+import { markHallSections, zones, zoneOf } from './model/navigation.js';
 import { selectedRooms, pageTitle } from './model/summary.js';
 import { stepTarget, snapSpeed } from './model/devices.js';
 import { h, icon, morph } from './ui/dom.js';
@@ -28,7 +28,7 @@ const root = document.getElementById('app');
 const states = new Map();
 // «Отопление» по вкладке «Отопление» из панелей Home Assistant; пусто — раздел собирается сам.
 let heatingSpec = [];
-const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false, youtube: readYouTube(), heatWanted: {} };
+const ui = { pendingTarget: {}, rememberedMode: {}, drag: {}, gateCooling: {}, menu: false, youtube: readYouTube(), heatWanted: {}, climateOpen: {} };
 
 // Кнопка YouTube на главной: включают и выключают в меню ☰, помнит каждое устройство своё.
 function readYouTube() {
@@ -74,7 +74,13 @@ function go(next) {
 }
 
 function back() {
-  const next = route.startsWith('room:') && parent.startsWith('zone:') ? parent : 'home';
+  // Комната → этаж или группа, откуда пришли; группа → её этаж (дом в одну зону — главная).
+  let next = 'home';
+  if (route.startsWith('room:') && (parent.startsWith('zone:') || parent.startsWith('group:'))) next = parent;
+  else if (route.startsWith('group:')) {
+    const list = rooms(); const first = selectedRooms(list, route)[0];
+    if (first && zones(list).length > 1) next = 'zone:' + zoneOf(first);
+  }
   parent = 'home';
   go(next);
   parent = 'home';
@@ -144,6 +150,22 @@ function stepClimate(id, up) {
   targetTimers[id] = setTimeout(() => {
     dispatch({ type: 'ClimateTarget', id, target: ui.pendingTarget[id] });
     targetTimers[id] = setTimeout(() => { delete ui.pendingTarget[id]; render(); }, TARGET_CONFIRM_MS);
+  }, TARGET_DEBOUNCE_MS);
+}
+
+/** «+/−» общей карточки: одна цель всем доступным термостатам, каждому — своя команда. */
+function stepClimateGroup(ids, up) {
+  const devices = ids.map(findDevice).filter((d) => d && d.available);
+  if (!devices.length) return;
+  const lead = devices.find((d) => d.mode !== 'off') ?? devices[0];
+  const next = stepTarget({ ...lead, target: ui.pendingTarget[lead.id] ?? lead.target }, up);
+  for (const d of devices) ui.pendingTarget[d.id] = Math.min(d.max, Math.max(d.min, next));
+  render();
+  const key = 'group:' + ids.join(',');
+  clearTimeout(targetTimers[key]);
+  targetTimers[key] = setTimeout(() => {
+    dispatch({ batch: devices.map((d) => ({ type: 'ClimateTarget', id: d.id, target: ui.pendingTarget[d.id] })) });
+    targetTimers[key] = setTimeout(() => { for (const d of devices) delete ui.pendingTarget[d.id]; render(); }, TARGET_CONFIRM_MS);
   }, TARGET_DEBOUNCE_MS);
 }
 
@@ -265,6 +287,8 @@ function uiCommand(act) {
     case 'youtube': window.open('https://www.youtube.com/', '_blank', 'noopener'); return undefined;
     case 'logout': return logout({ base: location.origin }).finally(() => location.reload());
     case 'target': return stepClimate(act.id, act.up);
+    case 'group-target': return stepClimateGroup(act.ids, act.up);
+    case 'climate-open': ui.climateOpen[act.key] = !ui.climateOpen[act.key]; return render();
     default: musicUiCommand(act); return undefined;
   }
 }

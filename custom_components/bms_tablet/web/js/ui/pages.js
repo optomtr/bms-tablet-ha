@@ -5,12 +5,12 @@ import { h, icon } from './dom.js';
 import {
   press, sectionTitle, emptySection, grid, fullCell, bulkPair, navTile, actionButton,
 } from './components.js';
-import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, coverCard, coverGroupCard } from './controls.js';
+import { zoneGroup, floorHeatingCard, irrigationCard, equipmentCard, fanGroup, climateCard, climateGroupCard, coverCard, coverGroupCard } from './controls.js';
 import { roomCard } from './photos.js';
 import { musicPage, MUSIC } from './music.js';
 import { cameraPage } from './cameras.js';
 import { CAMERAS, hasCameras } from '../model/cameras.js';
-import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorSplit, zoneOf, zoneTitle, coverGroups, isHallRoom } from '../model/navigation.js';
+import { zoneLabel, roomPages, pageKey, pageOf, isCurtain, buildings, buildingOf, MAIN_BUILDING, floorCards, zoneOf, zoneTitle, coverGroups, isHallRoom } from '../model/navigation.js';
 import { availableModes, hasSpeed } from '../model/devices.js';
 import { formatTemp, gatesLabel, plural, pageModel } from '../model/summary.js';
 import { climatesOn, climatesOff, relaysSet, lightsSet, curtainsCommand } from '../model/actions.js';
@@ -43,6 +43,8 @@ export function renderPage(route, rooms, selected, ctx) {
   if (route === 'home') return homePage(model, { ...ctx, rooms });
   const title = ctx.title;
   if (route.startsWith('zone:') && !['Терраса', 'Двор', 'Бассейн'].includes(title)) return floorPage(selected, title, ctx);
+  // Группа комнат — та же страница этажа, карточки её комнат.
+  if (route.startsWith('group:')) return floorPage(selected, title, ctx, false);
   const outdoor = ctx.weather?.temperature ?? null;
   if (route === 'Отопление') return heatingPage(model, outdoor, g, ctx);
   if (route === 'Климат') return climatePage(model, outdoor, g, ctx);
@@ -118,14 +120,15 @@ function zoneRow(row) {
     icon('premium_next', 'next'));
 }
 
-/** Страница этажа: карточки комнат с фото (FloorOverview). */
-function floorPage(rooms, title, ctx) {
-  const { featured, others } = floorSplit(roomPages(rooms), []);
+/** Страница этажа: карточки комнат с фото (FloorOverview); grouped — группы комнат одной плиткой. */
+function floorPage(rooms, title, ctx, grouped = true) {
+  const pages = roomPages(rooms);
+  const { cards, others } = floorCards(grouped ? pages : pages.map((r) => ({ ...r, group: null })), []);
   const out = [];
-  if (featured.length) {
+  if (cards.length) {
     out.push(sectionTitle('Комнаты'));
     out.push(grid(ctx.grid.phone ? 2 : ctx.grid.columns,
-      featured.map((room) => roomCard(room, 'room:' + pageKey(room), pageOf(room), ctx)), 'rooms'));
+      cards.map((c) => roomCard(c.room, c.nav, c.title, ctx)), 'rooms'));
   }
   // Санузлы — маленькими плитками внизу (как FloorOverview на планшете).
   const small = others.map((room) => navTile(pageOf(room), utilityIcon(pageOf(room)), 'room:' + pageKey(room), 'other:' + room.id, roomy(ctx.grid)));
@@ -282,7 +285,8 @@ function roomPage(model, selected, g, ctx) {
     out.push(cards(lightCards(model.lightBlocks, g, ctx), g, 'room-light-grid'));
   }
   const multi = selected.length > 1;
-  const list = model.cards().map((card) => {
+  // Термостаты общей карточки — только когда она раскрыта.
+  const list = model.cards().filter((card) => !card.memberOf || ctx.ui.climateOpen?.[card.memberOf]).map((card) => {
     const full = g.spansFull(card.tiles ?? 0);
     const opts = { perRow: g.tilesPerRow(full), full, key: 'pc:' + card.key, ctx };
     switch (card.type) {
@@ -292,19 +296,13 @@ function roomPage(model, selected, g, ctx) {
       case 'floor': return floorHeatingCard(card.relays, opts);
       case 'irrigation': return irrigationCard(card.zones, opts);
       case 'media': return equipmentCard(card.devices, opts);
+      case 'climateGroup': return climateGroupCard({ ...card }, { key: 'pc:' + card.key, ctx });
       case 'climate': return climateCard(card.device, multi ? card.room.name : KIND_RU[card.device.kind], { key: 'pc:' + card.key, ctx });
       default: return null;
     }
   }).filter(Boolean).map((el) => fullCell(el, el.classList.contains('full')));
   if (list.length) out.push(cards(list, g, 'room-cards'));
   out.push(...fanRows(model.fans, g, ctx));
-  if (model.sensorRooms.length) {
-    out.push(sectionTitle('Датчики', 'sensors-title'));
-    // Графика за сутки в веб-версии нет — показания без кнопки.
-    out.push(grid(g.columns, model.sensorRooms.map((r) => h('div.press.action', { 'data-key': 'sensor:' + r.id },
-      icon('ic_thermo'),
-      h('span', `${r.name} · ${r.sensors.airTemp != null ? formatTemp(r.sensors.airTemp) + '°' : '—'} · ${r.sensors.humidity != null ? Math.trunc(r.sensors.humidity) + '%' : '—'}`))), 'sensors'));
-  }
   if (!selected.length) out.push(emptySection());
   return out;
 }

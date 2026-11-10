@@ -5,7 +5,7 @@
 import { h, icon } from './dom.js';
 import { press, group, group as group_, tiles, tile, lamp, actionButton, holdButton, lightIcon, equipmentIcon, configured } from './components.js';
 import { availableModes, HVAC, speedSteps, hasSpeed, speedLabel } from '../model/devices.js';
-import { formatTemp } from '../model/summary.js';
+import { formatTemp, plural, climateGroupState, climateGroupPower } from '../model/summary.js';
 import { isGateCover } from '../model/navigation.js';
 
 /** Карточка света и тумблеров одной подзоны (ZoneGroup). Лампочка в углу — весь свет карточки. */
@@ -164,6 +164,45 @@ export function climateCard(device, title, { key, ctx }) {
 }
 
 const KIND_TITLE = { AC: 'Кондиционер', FLOOR: 'Тёплый пол', RADIATOR: 'Радиатор', CONVECTOR: 'Конвектор' };
+
+/**
+ * Общая карточка вида термостатов комнаты: питание и «+/−» — всем доступным сразу,
+ * «Все термостаты» раскрывает их карточки ниже.
+ */
+export function climateGroupCard(group, { key, ctx }) {
+  const { live, on, target, current, unavailable } = climateGroupState(group.devices, ctx.ui.pendingTarget);
+  const lead = on[0] ?? live[0];
+  const ready = ctx.live && live.length > 0;
+  const isOn = on.length > 0;
+  const n = group.devices.length;
+  const open = !!ctx.ui.climateOpen?.[group.key];
+  const ids = live.map((d) => d.id);
+  const kindIcon = group.kind === 'FLOOR' ? 'ic_floor' : 'ic_radiator';
+  const status = !live.length ? 'Недоступно' : isOn ? `Включено ${on.length} из ${n}` : 'Выключено';
+  const power = climateGroupPower(group.devices, !isOn, ctx.ui.rememberedMode);
+  return h('section.card.thermo.thermo-group', { style: `--accent:${isOn ? 'var(--gold)' : 'var(--muted)'}`, 'data-key': key },
+    h('div.head',
+      icon(kindIcon),
+      h('div.names', h('div.n', KIND_TITLE[group.kind]), h('div.c', `${n} ${plural(n, 'термостат', 'термостата', 'термостатов')}`)),
+      press('power', {
+        on: isOn, enabled: ready && power.length > 0,
+        act: power.length ? { batch: power } : null,
+        label: `${isOn ? 'Выключить' : 'Включить'} все: ${KIND_TITLE[group.kind]}`,
+      }, icon('ic_power'))),
+    h('div.status',
+      h('span.s', unavailable && live.length ? `${status} · недоступно ${unavailable}` : status),
+      h('span.p', 'Питание')),
+    h('div.setpoint',
+      h('div.l', 'Заданная температура'),
+      h('div.row',
+        press('step', { enabled: ready && isOn && target > lead.min, act: { ui: 'group-target', ids, up: false }, label: `Уменьшить температуру: ${KIND_TITLE[group.kind]}` }, '−'),
+        h('div.value', target != null ? `${formatTemp(target)}°` : '—'),
+        press('step', { enabled: ready && isOn && target < lead.max, act: { ui: 'group-target', ids, up: true }, label: `Повысить температуру: ${KIND_TITLE[group.kind]}` }, '+')),
+      h('div.now', `Сейчас  ${current != null ? formatTemp(current) + '°' : '—'}`)),
+    h('div.rule'),
+    press('group-open', { on: open, act: { ui: 'climate-open', key: group.key }, label: open ? 'Скрыть термостаты' : 'Показать все термостаты' },
+      h('span', open ? 'Скрыть термостаты' : `Все термостаты · ${n}`), h('span.chev', open ? '▲' : '▼')));
+}
 
 function fanLabel(value) {
   switch (value) {

@@ -1,6 +1,6 @@
 // Сводка по дому, строки зон, модель страницы и форматирование.
 // Порт ui/premium/HomeSummary.kt, PageModel/selectedRooms/pageTitle из PremiumHome.kt, model/Format.kt.
-import { CLIMATE_KIND, CLIMATE_KIND_ORDER, roomFans, roomIrrigation, roomMedia, hasSpeed, sensorsEmpty, roomLightsOn } from './devices.js';
+import { CLIMATE_KIND, CLIMATE_KIND_ORDER, roomFans, roomIrrigation, roomMedia, hasSpeed, roomLightsOn, availableModes } from './devices.js';
 import {
   zoneOf, zones, zoneLabel, zoneTitle, roomPages, pageOf, pageRooms, isGateCover, isCurtain, isFloorHeatingRelay,
   lightSections, roomLayout, isHallRoom, coverGroups,
@@ -128,6 +128,7 @@ const after = (route) => route.slice(route.indexOf(':') + 1);
 export function selectedRooms(rooms, route) {
   if (route.startsWith('room:')) return pageRooms(rooms, after(route));
   if (route.startsWith('zone:')) { const zone = after(route); return rooms.filter((r) => zoneOf(r) === zone); }
+  if (route.startsWith('group:')) { const g = after(route); return rooms.filter((r) => (r.group ?? '').trim() === g); }
   return rooms;
 }
 
@@ -135,6 +136,7 @@ export function pageTitle(route, selected, homeName) {
   if (route === 'home') return homeName ?? 'Мой дом';
   if (route.startsWith('room:')) return selected.length ? pageOf(selected[0]) : '';
   if (route.startsWith('zone:')) return zoneTitle(after(route));
+  if (route.startsWith('group:')) return after(route);
   if (route.includes(':')) return after(route);
   return route;
 }
@@ -201,7 +203,6 @@ export function pageModel(rooms, selected) {
     : byId(selected.flatMap(roomMedia).filter((t) => !isFloorHeatingRelay(t)))));
   // Зоны полива страницы — по ним спрашиваем «Полито: …».
   lazy(m, 'irrigationIds', () => m.irrigation.map((t) => t.id));
-  lazy(m, 'sensorRooms', () => selected.filter((r) => !sensorsEmpty(r.sensors)));
   m.cards = () => {
     const out = [];
     for (const zone of m.layout?.zones ?? []) {
@@ -217,11 +218,54 @@ export function pageModel(rooms, selected) {
     // Полив — сразу за шторами и воротами: во дворе это соседи по смыслу.
     if (m.irrigation.length) out.push({ type: 'irrigation', key: 'irrigation', zones: m.irrigation, tiles: m.irrigation.length });
     if (m.floorRelays.length) out.push({ type: 'floor', key: 'floor-heating', relays: m.floorRelays, tiles: m.floorRelays.length });
-    for (const { room, device } of m.climates) out.push({ type: 'climate', key: `climate/${device.id}`, room, device });
+    // Комната с несколькими тёплыми полами или радиаторами — одна общая карточка на вид,
+    // термостаты под ней раскрываются по кнопке (владелец, холл, 10.11.2026).
+    const one = selected.length === 1;
+    const done = new Set();
+    for (const { room, device } of m.climates) {
+      const kind = device.kind;
+      const members = one && GROUPED_KINDS.includes(kind) ? m.climates.filter((c) => c.device.kind === kind) : [];
+      if (members.length < 2) { out.push({ type: 'climate', key: `climate/${device.id}`, room, device }); continue; }
+      if (done.has(kind)) continue;
+      done.add(kind);
+      const key = `climate-group/${kind}`;
+      out.push({ type: 'climateGroup', key, kind, devices: members.map((c) => c.device) });
+      for (const c of members) out.push({ type: 'climate', key: `climate/${c.device.id}`, room: c.room, device: c.device, memberOf: key });
+    }
     if (m.media.length) out.push({ type: 'media', key: 'media', devices: m.media, tiles: m.media.length });
     return out;
   };
   return m;
+}
+
+/** Виды термостатов, которые на странице комнаты собираются в одну общую карточку. */
+export const GROUPED_KINDS = Object.freeze(['FLOOR', 'RADIATOR', 'CONVECTOR']);
+
+/**
+ * Общая карточка термостатов: питание и «+/−» уходят каждому доступному термостату
+ * отдельной командой — недоступный не мешает остальным.
+ */
+export function climateGroupState(devices, pendingTarget = {}) {
+  const live = devices.filter((d) => d.available);
+  const on = live.filter((d) => d.mode !== 'off');
+  const lead = on[0] ?? live[0] ?? null;
+  return {
+    live, on,
+    target: lead ? (pendingTarget[lead.id] ?? lead.target) : null,
+    current: lead?.current ?? null,
+    unavailable: devices.length - live.length,
+  };
+}
+
+/** Команды питания общей карточки: включить — каждому свой режим обогрева, выключить — включённые. */
+export function climateGroupPower(devices, turnOn, remembered = {}) {
+  const live = devices.filter((d) => d.available);
+  if (!turnOn) return live.filter((d) => d.mode !== 'off').map((d) => ({ type: 'ClimateMode', id: d.id, mode: 'off' }));
+  return live.filter((d) => d.mode === 'off').map((d) => {
+    const modes = availableModes(d).filter((x) => x !== 'off');
+    const mode = modes.find((x) => x === remembered[d.id]) ?? modes.find((x) => x === 'heat') ?? modes[0];
+    return mode ? { type: 'ClimateMode', id: d.id, mode } : null;
+  }).filter(Boolean);
 }
 
 /** Комната из одних климатических приборов («Климат» дачи): «8 кондиционеров · включено 1»; иначе null. */

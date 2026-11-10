@@ -286,6 +286,7 @@ export function parseTabletConfig(attributes, httpBase) {
       areaId,
       name: str(r, 'name') ?? areaId,
       floorName: str(r, 'floor_name'),
+      group: str(r, 'group'),
       originalName: str(r, 'original_name'),
       order: int(r, 'order', i),
       entities,
@@ -416,7 +417,7 @@ export function buildRoomsFromConfig(config, states) {
     const avail = (d) => isUsableState((stateOf(states, d.id) ?? UNAVAILABLE).state);
     const finish = (d, withZone) => ({ ...d, icon: icons.get(d.id) ?? null, ...(withZone ? { zone: zones.get(d.id) ?? null } : {}), available: avail(d) });
     const room = {
-      id: rc.areaId, name: rc.name, floorName: rc.floorName, originalName: rc.originalName, hallSection: false,
+      id: rc.areaId, name: rc.name, floorName: rc.floorName, originalName: rc.originalName, group: rc.group ?? null, hallSection: false,
       sensors, background: rc.background,
       lights: lights.map((d) => finish(d, true)),
       climates: climates.map((d) => finish(d, false)),

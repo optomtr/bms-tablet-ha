@@ -87,9 +87,10 @@ def validate_home_patch(patch, merge=False):
     for area, room in rooms.items():
         text(area,128)
         if room is None: continue
-        if not isinstance(room,dict) or set(room)-{"visible","order","exclude","include","roles","name","floor_name","entity_names","cover_directions","entity_icons","entity_zones"}: raise ValueError("Некорректная комната")
+        if not isinstance(room,dict) or set(room)-{"visible","order","exclude","include","roles","name","floor_name","group","entity_names","cover_directions","entity_icons","entity_zones"}: raise ValueError("Некорректная комната")
         for key,value in room.items():
             if key in ("name","floor_name"): text(value,100,True)
+            elif key=="group": text(value,60,True)
             elif key=="visible" and not isinstance(value,bool): raise ValueError("visible должен быть boolean")
             elif key=="order": number(value,0,100000)
             elif key in ("exclude","include"):

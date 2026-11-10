@@ -419,6 +419,8 @@ def async_room_payload(
                 "name": cfg.get("name") or area["name"],
                 "original_name": area["name"],
                 "floor_name": cfg.get("floor_name") or area.get("floor_name"),
+                # Группа комнат этажа: одна плитка, внутри — карточки её комнат.
+                "group": (cfg.get("group") or "").strip() or None,
                 "order": int(cfg.get("order", index)),
                 "entities": entities,
                 "background": background,

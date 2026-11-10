@@ -479,6 +479,8 @@ class BmsTabletEditor extends HTMLElement {
         ${open ? `<div class="rows">
           <div class="field"><label>Название на планшете</label><input type="text" maxlength="100" data-act="room-name" data-id="${esc(area.area_id)}" value="${esc(cfg.name || "")}" placeholder="${esc(area.name)}"></div>
           <div class="field"><label>Этаж / зона на планшете</label><input type="text" maxlength="100" data-act="room-floor" data-id="${esc(area.area_id)}" value="${esc(cfg.floor_name || "")}" placeholder="${esc(area.floor_name || "Как в Home Assistant")}"></div>
+          <div class="field"><label>Группа комнат</label><input type="text" maxlength="60" data-act="room-group" data-id="${esc(area.area_id)}" value="${esc(cfg.group || "")}" placeholder="Без группы"></div>
+          <p class="hint">Комнаты этажа с одной группой планшет показывает одной плиткой, внутри — их карточки.</p>
           <p class="hint">Пустое поле — название из Home Assistant. Изменения касаются только планшета. Сохраняются после выхода из поля.</p>
           <p class="hint">Устройства с одинаковой зоной планшет показывает отдельной карточкой. Название вида «Летняя кухня · Споты» тоже задаёт зону.</p>
           <button data-act="room-photo" data-id="${esc(area.area_id)}">Настроить фотографию комнаты</button>
@@ -827,6 +829,7 @@ class BmsTabletEditor extends HTMLElement {
 
       if (act === "room-name") return this._patchRoom(id,{name:target.value.trim() || null});
       if (act === "room-floor") return this._patchRoom(id,{floor_name:target.value.trim() || null});
+      if (act === "room-group") return this._patchRoom(id,{group:target.value.trim() || null});
       if (act === "entity-name") return this._patchRoom(target.dataset.area,{entity_names:{[id]:target.value.trim() || null}});
       if (act === "entity-zone") return this._patchRoom(target.dataset.area,{entity_zones:{[id]:target.value.trim().slice(0,60) || null}});
       if (["zoom","dx","dy"].includes(act)) return this._ws("background/set",{area_id:id,transform:{[act]:Number(target.value)/100}}).then(()=>this._reload());

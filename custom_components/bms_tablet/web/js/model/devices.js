@@ -79,7 +79,7 @@ export const roomBackground = (f) => ({
 
 export function makeRoom(f) {
   return {
-    floorName: null, originalName: null, hallSection: false,
+    floorName: null, originalName: null, group: null, hallSection: false,
     lights: [], climates: [], covers: [], toggles: [], cameras: [],
     ...f,
     sensors: roomSensors(f.sensors || {}),
