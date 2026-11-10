@@ -317,6 +317,14 @@ function seriesTitle(base) {
 }
 
 /** Группы штор [{title, rows:[{label, device}]}]; null — штор мало, каждая своей карточкой. */
+/** Внутри группы штор: без стороны первыми, затем «слева», затем «справа» (владелец, холл, 10.11.2026). */
+export function sideRank(label) {
+  const s = clean(label);
+  if (/(^|\s)слева($|\s)/u.test(s)) return 1;
+  if (/(^|\s)справа($|\s)/u.test(s)) return 2;
+  return 0;
+}
+
 export function coverGroups(covers, hall) {
   if (covers.length < COVER_GROUP_MIN) return null;
   const groups = new Map();
@@ -341,7 +349,7 @@ export function coverGroups(covers, hall) {
   }
   return [...groups.values()].map(({ title, items }) => ({
     title,
-    rows: items.map((x, i) => ({ ...x, i })).sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || a.i - b.i)
+    rows: items.map((x, i) => ({ ...x, i })).sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || sideRank(a.label) - sideRank(b.label) || a.i - b.i)
       .map(({ label, device }) => ({ label, device })),
   }));
 }
